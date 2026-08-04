@@ -13,6 +13,7 @@ const VALID_CATEGORIES = [
   'Personal Care',
   'Subscriptions',
   'Auto-Captured',
+  'Requires Review',
   'Other',
 ];
 
@@ -22,12 +23,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Requested-With',
 };
 
-// ─── SMS Parser ───────────────────────────────────────────────────────────────
+// ─── Category keyword map ─────────────────────────────────────────────────────
 
-/**
- * Keyword → category mapping.
- * Words are matched case-insensitively against the raw SMS text.
- */
 const CATEGORY_KEYWORDS = {
   'Food & Dining': [
     'zomato', 'swiggy', 'restaurant', 'cafe', 'coffee', 'tea', 'food',
@@ -37,7 +34,7 @@ const CATEGORY_KEYWORDS = {
   'Shopping': [
     'amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'meesho', 'shop',
     'store', 'market', 'mall', 'mart', 'retail', 'bazar', 'bazaar',
-    'reliance', 'dmart', 'bigbasket', 'grofer', 'zepto', 'blinkit',
+    'dmart', 'bigbasket', 'grofer', 'zepto', 'blinkit',
   ],
   'Transportation': [
     'uber', 'ola', 'rapido', 'auto', 'cab', 'taxi', 'irctc', 'railway',
@@ -46,17 +43,15 @@ const CATEGORY_KEYWORDS = {
   ],
   'Bills & Utilities': [
     'electric', 'electricity', 'water', 'gas', 'internet', 'broadband',
-    'wifi', 'airtel', 'jio', 'vi ', 'bsnl', 'recharge', 'bill', 'utility',
-    'bescom', 'tata power', 'reliance energy', 'mahadiscom',
+    'wifi', 'airtel', 'jio', 'bsnl', 'recharge', 'bill', 'utility',
   ],
   'Entertainment': [
     'netflix', 'prime', 'hotstar', 'disney', 'spotify', 'youtube',
-    'movie', 'cinema', 'pvr', 'inox', 'bookmyshow', 'gaming', 'game',
+    'movie', 'cinema', 'pvr', 'inox', 'bookmyshow', 'gaming',
   ],
   'Healthcare': [
     'pharmacy', 'medical', 'hospital', 'clinic', 'doctor', 'medicine',
     'apollo', 'medplus', 'netmeds', '1mg', 'practo', 'health', 'lab',
-    'pathology', 'diagnostic',
   ],
   'Personal Care': [
     'salon', 'spa', 'parlour', 'parlor', 'haircut', 'beauty', 'grooming',
@@ -66,10 +61,6 @@ const CATEGORY_KEYWORDS = {
   ],
 };
 
-/**
- * Infer a category from the raw SMS text and parsed merchant name.
- * Returns the best match or 'Other'.
- */
 function inferCategory(smsText, merchantName = '') {
   const haystack = `${smsText} ${merchantName}`.toLowerCase();
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
@@ -77,90 +68,70 @@ function inferCategory(smsText, merchantName = '') {
       if (haystack.includes(kw)) return category;
     }
   }
-  return 'Auto-Captured'; // default for SMS — no keyword match
+  return 'Auto-Captured';
 }
 
+// ─── SMS Parser — NEVER throws, always returns a result ──────────────────────
+
 /**
- * Parse a raw Indian bank SMS string and extract transaction fields.
- *
- * Amount  : /Rs\.?\s*([\d,]+\.?\d*)/i
- * Merchant: /to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i  (with fallbacks)
- * Category: keyword inference, defaulting to 'Auto-Captured'
- * Date    : new Date().toISOString()
- *
- * @param {string} sms
- * @returns {{ amount: number, merchant: string, category: string, date: string } | null}
+ * Attempts to parse amount + merchant from a raw bank SMS.
+ * On any failure, returns safe fallback values instead of erroring.
  */
-function parseSms(sms) {
-  if (!sms || typeof sms !== 'string') return null;
+function parseSms(rawSms) {
+  const text = (rawSms || '').trim();
+  const preview = text.substring(0, 20); // for fallback merchant label
 
-  const text = sms.trim();
+  let amount = 0;
+  let merchant = `Unparsed: ${preview}`;
+  let category = 'Requires Review';
 
-  // ── 1. Extract amount ─────────────────────────────────────────────────────
-  // Primary: your exact requested regex — Rs.1,234.50 | Rs 500 | Rs.500/-
-  const amountRegex = /Rs\.?\s*([\d,]+\.?\d*)/i;
-  let amountMatch = text.match(amountRegex);
+  try {
+    // ── Amount ───────────────────────────────────────────────────────────────
+    // Primary: Rs / Rs. (your exact requested regex)
+    const amountMatch =
+      text.match(/Rs\.?\s*([\d,]+\.?\d*)/i) ||
+      text.match(/(?:INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i);
 
-  // Fallback: also handle INR and ₹ prefixes
-  if (!amountMatch) {
-    amountMatch = text.match(/(?:INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i);
-  }
-
-  if (!amountMatch) {
-    console.warn('[SMS Parser] Could not extract amount from:', text.slice(0, 100));
-    return null;
-  }
-
-  const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-  if (isNaN(amount) || amount <= 0) return null;
-
-  // ── 2. Extract merchant ───────────────────────────────────────────────────
-  let merchant = 'Unknown Merchant';
-
-  // Your exact requested regex first
-  const primaryMerchantRegex = /to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i;
-  const primaryMatch = text.match(primaryMerchantRegex);
-
-  if (primaryMatch && primaryMatch[1] && primaryMatch[1].trim().length > 0) {
-    merchant = primaryMatch[1].trim();
-  } else {
-    // Fallbacks for VPA/UPI patterns common in Indian bank SMS
-    const fallbackPatterns = [
-      /VPA[:\s]+([^\s,;.]+)/i,           // VPA merchant@upi
-      /info\/([^\/\s,;.]+)/i,             // info/MerchantName
-      /\bto\s+([A-Za-z0-9@.\-_]+(?:\s+[A-Za-z0-9@.\-_]+){0,3}?)(?:\s+(?:on|at|via|for|ref|upi|a\/c|\d)|[,;.]|$)/i,
-      /\b([A-Za-z0-9.\-_]+@[A-Za-z0-9.\-_]+)\b/, // UPI ID
-    ];
-
-    for (const pattern of fallbackPatterns) {
-      const match = text.match(pattern);
-      if (match && match[1] && match[1].trim().length > 0) {
-        merchant = match[1].trim();
-        break;
+    if (amountMatch && amountMatch[1]) {
+      const parsed = parseFloat(amountMatch[1].replace(/,/g, ''));
+      if (!isNaN(parsed) && parsed > 0) {
+        amount = parsed;
       }
     }
+
+    // ── Merchant ─────────────────────────────────────────────────────────────
+    // Primary: your exact requested regex
+    const merchantMatch =
+      text.match(/to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i) ||
+      text.match(/VPA[:\s]+([^\s,;.@]+)/i) ||
+      text.match(/info\/([^\/\s,;.]+)/i) ||
+      text.match(/\bto\s+([A-Za-z0-9@.\-_]+(?:\s+[A-Za-z0-9@.\-_]+){0,3}?)(?:\s+(?:on|at|via|for|ref|upi|a\/c|\d)|[,;.]|$)/i) ||
+      text.match(/\b([A-Za-z0-9.\-_]+@[A-Za-z0-9.\-_]+)\b/);
+
+    if (merchantMatch && merchantMatch[1] && merchantMatch[1].trim().length > 0) {
+      let raw = merchantMatch[1].trim();
+      raw = raw.replace(/[.,;:\-]+$/, '').trim();
+      if (raw.includes('@')) raw = raw.split('@')[0];
+      merchant = raw
+        .split(/[\s_-]+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ') || `Unparsed: ${preview}`;
+    }
+
+    // ── Category ─────────────────────────────────────────────────────────────
+    if (amount > 0) {
+      // Only infer category if we got a real merchant
+      category = inferCategory(text, merchant);
+    }
+    // If amount is 0, keep 'Requires Review' so the user knows to check it
+
+  } catch (err) {
+    // Parsing threw unexpectedly — log and keep fallbacks
+    console.error('[SMS Parser] Unexpected error during parse:', err.message);
   }
 
-  // Clean up merchant string
-  merchant = merchant.replace(/[.,;:\-]+$/, '').trim();
-  // Strip UPI handle — use the readable part before @
-  if (merchant.includes('@')) {
-    merchant = merchant.split('@')[0];
-  }
-  // Title-case
-  merchant = merchant
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ') || 'Unknown Merchant';
-
-  // ── 3. Category — keyword inference, default to 'Auto-Captured' ──────────
-  const category = inferCategory(text, merchant);
-
-  // ── 4. Date = current timestamp ──────────────────────────────────────────
-  const date = new Date().toISOString();
-
-  return { amount, merchant, category, date };
+  return { amount, merchant, category };
 }
 
 // ─── CORS preflight ───────────────────────────────────────────────────────────
@@ -172,97 +143,103 @@ export async function OPTIONS() {
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request) {
+  // ── Log the raw incoming payload for Vercel debugging ─────────────────────
   try {
-    // Parse JSON body
+    const rawText = await request.clone().text();
+    console.log('Incoming Payload:', rawText);
+  } catch (logErr) {
+    console.warn('Could not log raw payload:', logErr.message);
+  }
+
+  try {
+    // ── Parse JSON body ────────────────────────────────────────────────────
     let body;
     try {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { success: false, error: 'Invalid JSON payload in request body' },
+        { success: false, error: 'Invalid JSON — could not parse request body' },
         { status: 400, headers: corsHeaders }
       );
     }
 
+    console.log('Parsed Body Keys:', Object.keys(body || {}));
+
     const { user_id } = body || {};
-    let amount, merchant, category, date, parsedFromSms = false, smsDebug = null;
+    let amount, merchant, category, date;
+    let parsedFromSms = false;
+    let smsDebug = null;
 
-    // ── Path A: raw_sms field present — parse the SMS ───────────────────────
+    // ── Path A: raw_sms present ────────────────────────────────────────────
     if (body?.raw_sms) {
-      const parsed = parseSms(body.raw_sms);
+      console.log('[SMS] raw_sms detected, length:', body.raw_sms.length);
 
-      if (!parsed) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'SMS parsing failed',
-            details: 'Could not extract a valid amount from the SMS text. Ensure it contains Rs/INR/₹ followed by a number.',
-            raw_sms: body.raw_sms,
-          },
-          { status: 422, headers: corsHeaders }
-        );
-      }
+      const parsed = parseSms(body.raw_sms);
 
       amount   = parsed.amount;
       merchant = parsed.merchant;
       category = parsed.category;
-      date     = parsed.date;
+      date     = new Date().toISOString();
       parsedFromSms = true;
-      smsDebug = { raw: body.raw_sms, extracted: { amount: parsed.amount, merchant: parsed.merchant, category: parsed.category } };
 
-      console.log('[SMS Parser] Extracted:', smsDebug.extracted, '| from:', body.raw_sms.slice(0, 80));
+      smsDebug = {
+        raw_preview: body.raw_sms.substring(0, 80),
+        extracted: { amount, merchant, category },
+      };
+
+      console.log('[SMS] Extracted:', smsDebug.extracted);
     }
 
-    // ── Path B: structured JSON payload (existing behaviour) ────────────────
+    // ── Path B: structured JSON payload (existing behaviour) ──────────────
     else {
       amount   = body?.amount;
       merchant = body?.merchant;
       category = body?.category;
       date     = body?.date;
+
+      // Structured path still validates strictly
+      const errors = [];
+
+      if (amount === undefined || amount === null || amount === '') {
+        errors.push('amount is required');
+      } else if (isNaN(Number(amount)) || Number(amount) <= 0) {
+        errors.push('amount must be a positive number');
+      }
+
+      if (!merchant || typeof merchant !== 'string' || !merchant.trim()) {
+        errors.push('merchant is required and must be a non-empty string');
+      }
+
+      if (!category || typeof category !== 'string' || !category.trim()) {
+        errors.push('category is required and must be a non-empty string');
+      }
+
+      if (!date || isNaN(Date.parse(date))) {
+        errors.push('date is required and must be a valid ISO date string');
+      }
+
+      if (errors.length > 0) {
+        console.warn('Structured payload validation failed:', errors);
+        return NextResponse.json(
+          { success: false, error: 'Validation failed', details: errors },
+          { status: 400, headers: corsHeaders }
+        );
+      }
     }
 
-    // ── Validate extracted / provided fields ────────────────────────────────
-    const errors = [];
-
-    if (amount === undefined || amount === null || amount === '') {
-      errors.push('amount is required');
-    } else if (isNaN(Number(amount)) || Number(amount) <= 0) {
-      errors.push('amount must be a positive number');
-    }
-
-    if (!merchant || typeof merchant !== 'string' || !merchant.trim()) {
-      errors.push('merchant is required and must be a non-empty string');
-    }
-
-    if (!category || typeof category !== 'string' || !category.trim()) {
-      errors.push('category is required and must be a non-empty string');
-    } else if (!parsedFromSms && !VALID_CATEGORIES.includes(category.trim())) {
-      // For structured payloads: soft-warn on unknown category but accept it
-      console.warn(`Unknown category: "${category}" — stored as-is.`);
-    }
-
-    if (!date || isNaN(Date.parse(date))) {
-      errors.push('date is required and must be a valid ISO date string');
-    }
-
-    if (errors.length > 0) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed', details: errors },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // ── Build the insert record ──────────────────────────────────────────────
+    // ── Build insert record ────────────────────────────────────────────────
     const insertRecord = {
-      amount:   Number(amount),
-      merchant: String(merchant).trim(),
-      category: String(category).trim(),
-      date:     new Date(date).toISOString(),
+      amount:   Number(amount)   || 0,
+      merchant: String(merchant || 'Unknown').trim(),
+      category: String(category || 'Requires Review').trim(),
+      date:     date ? new Date(date).toISOString() : new Date().toISOString(),
     };
 
     if (user_id && typeof user_id === 'string' && user_id.trim()) {
       insertRecord.user_id = user_id.trim();
     }
+
+    console.log('Inserting record:', JSON.stringify(insertRecord));
 
     const localFallback = {
       id: 'tx-' + Date.now(),
@@ -270,14 +247,14 @@ export async function POST(request) {
       created_at: new Date().toISOString(),
     };
 
-    // ── Local / demo mode ────────────────────────────────────────────────────
+    // ── Local / demo mode ──────────────────────────────────────────────────
     if (!isSupabaseConfigured) {
       return NextResponse.json(
         {
           success: true,
           message: parsedFromSms
             ? 'SMS parsed & validated (Supabase not configured — local mode)'
-            : 'Transaction validated (Supabase not configured — local mode)',
+            : 'Transaction validated (local mode)',
           data: localFallback,
           parsed_from_sms: parsedFromSms,
           ...(smsDebug && { sms_debug: smsDebug }),
@@ -286,7 +263,7 @@ export async function POST(request) {
       );
     }
 
-    // ── Insert into Supabase ─────────────────────────────────────────────────
+    // ── Insert into Supabase ───────────────────────────────────────────────
     const { data, error } = await supabase
       .from('transactions')
       .insert([insertRecord])
@@ -294,17 +271,18 @@ export async function POST(request) {
 
     if (error) {
       console.warn('Supabase Insert Error:', error.message);
+      // Still return 200 with fallback so iOS Shortcut doesn't retry endlessly
       return NextResponse.json(
         {
           success: true,
-          message: 'Transaction accepted (Supabase write failed — stored locally)',
+          message: 'Transaction accepted (Supabase write failed — check logs)',
           data: localFallback,
           warning: error.message,
           parsed_from_sms: parsedFromSms,
           hint: error.message.includes('row-level security')
-            ? 'RLS policy blocked the insert. Ensure user_id matches the authenticated user.'
+            ? 'RLS blocked the insert — ensure user_id matches the authenticated user.'
             : error.message.includes('schema cache')
-            ? 'The "transactions" table may not exist yet. Run the setup SQL in Supabase.'
+            ? 'The "transactions" table may not exist. Run the setup SQL in Supabase.'
             : undefined,
         },
         { status: 200, headers: corsHeaders }
