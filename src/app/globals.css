@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+:root {
+  --background: #070b12;
+  --foreground: #f8fafc;
+  --color-mint: #74FFAC;
+  --color-pink: #FF4885;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-mint: #74FFAC;
+  --color-pink: #FF4885;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  /* Allow text selection for copyable financial data */
+  user-select: text;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent selection only on interactive UI chrome (buttons, nav, icons) */
+button,
+nav,
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Allow copy on amounts and merchant names */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Custom Theme Utilities */
+.text-mint {
+  color: #74FFAC;
+}
+
+.bg-mint {
+  background-color: #74FFAC;
+}
+
+.border-mint {
+  border-color: #74FFAC;
+}
+
+.text-pink {
+  color: #FF4885;
+}
+
+.bg-pink {
+  background-color: #FF4885;
+}
+
+.border-pink {
+  border-color: #FF4885;
+}
+
+/* Monospace / Tabular numbers for financial metrics */
+.num-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Modern Fintech Glass & Card System */
+.glass-header {
+  background: rgba(7, 11, 18, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-nav {
+  background: rgba(7, 11, 18, 0.92);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-card-hover {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover:hover {
+  background: rgba(30, 41, 59, 0.65);
+  border-color: rgba(116, 255, 172, 0.25);
+  transform: translateY(-1px);
+}
+
+.glass-modal {
+  background: rgba(10, 15, 26, 0.97);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Button & FAB accents */
+.fab-shadow {
+  box-shadow: 0 8px 24px -4px rgba(116, 255, 172, 0.45), 0 2px 6px -1px rgba(255, 72, 133, 0.35);
+}
+
+.fab-shadow:active {
+  box-shadow: 0 4px 14px -2px rgba(116, 255, 172, 0.6);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(116, 255, 172, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(116, 255, 172, 0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Skeleton loading shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.5) 25%,
+    rgba(51, 65, 85, 0.5) 50%,
+    rgba(30, 41, 59, 0.5) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* Touch-friendly tap target sizing */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Swipe action reveal */
+.swipe-action-row {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(116, 255, 172, 0.2);
+  border-radius: 9999px;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area insets for modern mobile devices */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Toast notification */
+.toast-container {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toast {
+  pointer-events: auto;
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  white-space: nowrap;
+}
+
+/* Confirmation dialog overlay */
+.confirm-overlay {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+.confirm-dialog {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

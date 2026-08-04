@@ -1,0 +1,88 @@
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import Script from "next/script";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata = {
+  title: "AutoSpend - Automated Expense Tracker",
+  description: "Track and automate your personal expenses effortlessly with real-time financial intelligence",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "AutoSpend",
+    startupImage: [
+      { url: "/icon-512.png", media: "(device-width: 390px) and (device-height: 844px)" },
+    ],
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport = {
+  themeColor: "#74FFAC",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <head>
+        {/* iOS PWA meta tags */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="AutoSpend" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
+      <body className="min-h-full flex flex-col bg-[#070b12] text-slate-50">
+        {children}
+        {/* Service Worker Registration */}
+        <Script
+          id="sw-registration"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(function(reg) {
+                      console.log('[AutoSpend] SW registered:', reg.scope);
+                    })
+                    .catch(function(err) {
+                      console.warn('[AutoSpend] SW registration failed:', err);
+                    });
+                });
+              }
+            `,
+          }}
+        />
+      </body>
+    </html>
+  );
+}
