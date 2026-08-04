@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import ManualEntryModal from '@/components/ManualEntryModal';
@@ -238,7 +239,7 @@ export default function Home() {
 
   // ─── Main Authenticated Dashboard ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#070b12] text-slate-100 flex flex-col justify-between selection:bg-[#74FFAC] selection:text-slate-950">
+    <div className="min-h-screen bg-[#070b12] text-slate-100 selection:bg-[#74FFAC] selection:text-slate-950">
       <Header
         selectedCurrency={selectedCurrency}
         onCurrencyChange={setSelectedCurrency}
@@ -247,42 +248,90 @@ export default function Home() {
         onOpenDevSettings={() => setIsDevSettingsOpen(true)}
       />
 
-      <main className="flex-1 pt-20 pb-28 px-4 max-w-md w-full mx-auto space-y-6">
-        <ErrorBoundary>
-        {activeTab === 'home' ? (
-          <HomeView
-            transactions={transactions}
-            selectedCurrency={selectedCurrency}
-            isDataLoading={isDataLoading}
-            onNavigateToTransactions={() => setActiveTab('transactions')}
-            onOpenManualEntry={() => setIsModalOpen(true)}
-            onOpenDevSettings={() => setIsDevSettingsOpen(true)}
-            onEditTransaction={(tx) => setEditingTransaction(tx)}
-            onDeleteTransaction={requestDeleteTransaction}
-          />
-        ) : activeTab === 'insights' ? (
-          <InsightsView
-            transactions={transactions}
-            selectedCurrency={selectedCurrency}
-          />
-        ) : (
-          <TransactionsView
-            transactions={transactions}
-            selectedCurrency={selectedCurrency}
-            isDataLoading={isDataLoading}
-            onOpenManualEntry={() => setIsModalOpen(true)}
-            onEditTransaction={(tx) => setEditingTransaction(tx)}
-            onDeleteTransaction={requestDeleteTransaction}
-          />
-        )}
-        </ErrorBoundary>
-      </main>
+      {/* Desktop layout: centered narrow column with ambient background */}
+      <div className="min-h-screen flex flex-col lg:flex-row lg:justify-center lg:items-start lg:gap-8 lg:px-8 pt-16 pb-24">
 
-      <BottomNav
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onFabClick={() => setIsModalOpen(true)}
-      />
+        {/* Desktop left sidebar — only on lg+ */}
+        <aside className="hidden lg:flex flex-col gap-4 w-64 xl:w-72 pt-8 shrink-0 sticky top-16 h-[calc(100vh-4rem)]">
+          <div className="glass-card rounded-3xl p-5 border border-slate-800 space-y-1">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#74FFAC] to-emerald-400 flex items-center justify-center text-slate-950">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-extrabold text-white">Auto<span className="text-[#74FFAC]">Spend</span></p>
+                <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{currentUser?.email}</p>
+              </div>
+            </div>
+            {[
+              { id: 'home', label: 'Dashboard', icon: '⬡' },
+              { id: 'insights', label: 'Insights', icon: '◈' },
+              { id: 'transactions', label: 'History', icon: '≡' },
+            ].map((item) => (
+              <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === item.id
+                    ? 'bg-[#74FFAC]/10 text-[#74FFAC] border border-[#74FFAC]/20'
+                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                }`}>
+                <span className="text-base leading-none">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <div className="pt-3 mt-2 border-t border-slate-800">
+              <button type="button" onClick={() => setIsModalOpen(true)}
+                className="w-full py-2.5 rounded-xl bg-[#74FFAC] hover:bg-[#74FFAC]/90 text-slate-950 text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-[#74FFAC]/20">
+                <Plus className="w-4 h-4 stroke-[3]" />
+                Add Expense
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main content column */}
+        <main className="flex-1 lg:max-w-lg xl:max-w-xl w-full px-4 lg:px-0 pt-4 lg:pt-8 pb-4 space-y-6">
+          <ErrorBoundary>
+            {activeTab === 'home' ? (
+              <HomeView
+                transactions={transactions}
+                selectedCurrency={selectedCurrency}
+                isDataLoading={isDataLoading}
+                onNavigateToTransactions={() => setActiveTab('transactions')}
+                onOpenManualEntry={() => setIsModalOpen(true)}
+                onOpenDevSettings={() => setIsDevSettingsOpen(true)}
+                onEditTransaction={(tx) => setEditingTransaction(tx)}
+                onDeleteTransaction={requestDeleteTransaction}
+              />
+            ) : activeTab === 'insights' ? (
+              <InsightsView
+                transactions={transactions}
+                selectedCurrency={selectedCurrency}
+              />
+            ) : (
+              <TransactionsView
+                transactions={transactions}
+                selectedCurrency={selectedCurrency}
+                isDataLoading={isDataLoading}
+                onOpenManualEntry={() => setIsModalOpen(true)}
+                onEditTransaction={(tx) => setEditingTransaction(tx)}
+                onDeleteTransaction={requestDeleteTransaction}
+              />
+            )}
+          </ErrorBoundary>
+        </main>
+
+      </div>
+
+      {/* Bottom nav — mobile/tablet only (hidden on lg+) */}
+      <div className="lg:hidden">
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onFabClick={() => setIsModalOpen(true)}
+        />
+      </div>
 
       {/* Manual Entry — passes user_id to /api/sync */}
       <ManualEntryModal
