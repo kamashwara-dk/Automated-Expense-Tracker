@@ -12,6 +12,7 @@ const VALID_CATEGORIES = [
   'Healthcare',
   'Personal Care',
   'Subscriptions',
+  'Auto-Captured',
   'Other',
 ];
 
@@ -76,81 +77,90 @@ function inferCategory(smsText, merchantName = '') {
       if (haystack.includes(kw)) return category;
     }
   }
-  return 'Other';
+  return 'Auto-Captured'; // default for SMS — no keyword match
 }
 
 /**
  * Parse a raw Indian bank SMS string and extract transaction fields.
  *
- * Handles patterns like:
- *   "Rs.1,234.50 debited from A/c XX1234 to VPA merchant@upi on 04-Aug-26"
- *   "INR 500 paid to Zomato at 12:30"
- *   "₹250.00 debited. Info/Starbucks/UPI"
- *   "Sent Rs 1500 to John Doe (john@oksbi)"
- *   "Your a/c debited by Rs.450 for UPI txn. VPA: merchant@ybl"
+ * Amount  : /Rs\.?\s*([\d,]+\.?\d*)/i
+ * Merchant: /to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i  (with fallbacks)
+ * Category: keyword inference, defaulting to 'Auto-Captured'
+ * Date    : new Date().toISOString()
  *
  * @param {string} sms
- * @returns {{ amount: number, merchant: string, category: string, date: string, raw_sms: string } | null}
+ * @returns {{ amount: number, merchant: string, category: string, date: string } | null}
  */
 function parseSms(sms) {
   if (!sms || typeof sms !== 'string') return null;
 
   const text = sms.trim();
 
-  // ── 1. Extract amount ──────────────────────────────────────────────────────
-  // Matches: Rs.1,234.50 | Rs 1234 | INR 500 | ₹250.00 | Rs.500/-
-  const amountRegex = /(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i;
-  const amountMatch = text.match(amountRegex);
+  // ── 1. Extract amount ─────────────────────────────────────────────────────
+  // Primary: your exact requested regex — Rs.1,234.50 | Rs 500 | Rs.500/-
+  const amountRegex = /Rs\.?\s*([\d,]+\.?\d*)/i;
+  let amountMatch = text.match(amountRegex);
+
+  // Fallback: also handle INR and ₹ prefixes
   if (!amountMatch) {
-    console.warn('[SMS Parser] Could not extract amount from:', text);
+    amountMatch = text.match(/(?:INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i);
+  }
+
+  if (!amountMatch) {
+    console.warn('[SMS Parser] Could not extract amount from:', text.slice(0, 100));
     return null;
   }
+
   const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
   if (isNaN(amount) || amount <= 0) return null;
 
   // ── 2. Extract merchant ───────────────────────────────────────────────────
   let merchant = 'Unknown Merchant';
 
-  // Priority order of extraction patterns:
-  const merchantPatterns = [
-    // "to VPA merchant@upi" or "VPA: merchant@upi"
-    /VPA[:\s]+([^\s,;.]+)/i,
-    // "info/MerchantName" or "info/MerchantName/UPI"
-    /info\/([^\/\s,;.]+)/i,
-    // "to MerchantName" — word(s) after "to", stop at common terminators
-    /\bto\s+([A-Za-z0-9@.\-_]+(?:\s+[A-Za-z0-9@.\-_]+){0,3}?)(?:\s+(?:on|at|via|for|ref|upi|a\/c|\d)|[,;.]|$)/i,
-    // "at MerchantName"
-    /\bat\s+([A-Za-z0-9@.\-_]+(?:\s+[A-Za-z0-9@.\-_]+){0,2}?)(?:\s+(?:on|via|for|\d)|[,;.]|$)/i,
-    // UPI ID anywhere: word@word
-    /\b([A-Za-z0-9.\-_]+@[A-Za-z0-9.\-_]+)\b/,
-  ];
+  // Your exact requested regex first
+  const primaryMerchantRegex = /to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i;
+  const primaryMatch = text.match(primaryMerchantRegex);
 
-  for (const pattern of merchantPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      merchant = match[1].trim();
-      // Clean up: remove trailing punctuation
-      merchant = merchant.replace(/[.,;:\-]+$/, '').trim();
-      // If it's a UPI ID, use the part before @ as display name
-      if (merchant.includes('@')) {
-        merchant = merchant.split('@')[0];
+  if (primaryMatch && primaryMatch[1] && primaryMatch[1].trim().length > 0) {
+    merchant = primaryMatch[1].trim();
+  } else {
+    // Fallbacks for VPA/UPI patterns common in Indian bank SMS
+    const fallbackPatterns = [
+      /VPA[:\s]+([^\s,;.]+)/i,           // VPA merchant@upi
+      /info\/([^\/\s,;.]+)/i,             // info/MerchantName
+      /\bto\s+([A-Za-z0-9@.\-_]+(?:\s+[A-Za-z0-9@.\-_]+){0,3}?)(?:\s+(?:on|at|via|for|ref|upi|a\/c|\d)|[,;.]|$)/i,
+      /\b([A-Za-z0-9.\-_]+@[A-Za-z0-9.\-_]+)\b/, // UPI ID
+    ];
+
+    for (const pattern of fallbackPatterns) {
+      const match = text.match(pattern);
+      if (match && match[1] && match[1].trim().length > 0) {
+        merchant = match[1].trim();
+        break;
       }
-      // Capitalise first letter of each word
-      merchant = merchant
-        .split(/[\s_-]+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-      break;
     }
   }
 
-  // ── 3. Infer category ─────────────────────────────────────────────────────
+  // Clean up merchant string
+  merchant = merchant.replace(/[.,;:\-]+$/, '').trim();
+  // Strip UPI handle — use the readable part before @
+  if (merchant.includes('@')) {
+    merchant = merchant.split('@')[0];
+  }
+  // Title-case
+  merchant = merchant
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ') || 'Unknown Merchant';
+
+  // ── 3. Category — keyword inference, default to 'Auto-Captured' ──────────
   const category = inferCategory(text, merchant);
 
-  // ── 4. Date = now (SMS doesn't always have parseable timestamps) ──────────
+  // ── 4. Date = current timestamp ──────────────────────────────────────────
   const date = new Date().toISOString();
 
-  return { amount, merchant, category, date, raw_sms: text };
+  return { amount, merchant, category, date };
 }
 
 // ─── CORS preflight ───────────────────────────────────────────────────────────
@@ -198,9 +208,9 @@ export async function POST(request) {
       category = parsed.category;
       date     = parsed.date;
       parsedFromSms = true;
-      smsDebug = { raw: parsed.raw_sms, extracted: { amount, merchant, category } };
+      smsDebug = { raw: body.raw_sms, extracted: { amount: parsed.amount, merchant: parsed.merchant, category: parsed.category } };
 
-      console.log('[SMS Parser] Extracted:', smsDebug.extracted, '| from:', parsed.raw_sms.slice(0, 80));
+      console.log('[SMS Parser] Extracted:', smsDebug.extracted, '| from:', body.raw_sms.slice(0, 80));
     }
 
     // ── Path B: structured JSON payload (existing behaviour) ────────────────
@@ -226,8 +236,8 @@ export async function POST(request) {
 
     if (!category || typeof category !== 'string' || !category.trim()) {
       errors.push('category is required and must be a non-empty string');
-    } else if (!VALID_CATEGORIES.includes(category.trim())) {
-      // Accept unknown categories with a soft warning
+    } else if (!parsedFromSms && !VALID_CATEGORIES.includes(category.trim())) {
+      // For structured payloads: soft-warn on unknown category but accept it
       console.warn(`Unknown category: "${category}" — stored as-is.`);
     }
 

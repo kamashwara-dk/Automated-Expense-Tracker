@@ -11,6 +11,7 @@ const CATEGORY_COLORS = {
   'Subscriptions': { icon: Tv, bar: 'bg-[#FF4885]', text: 'text-[#FF4885]' },
   'Healthcare': { icon: HeartPulse, bar: 'bg-[#74FFAC]', text: 'text-[#74FFAC]' },
   'Other': { icon: Tag, bar: 'bg-slate-400', text: 'text-slate-400' },
+  'Auto-Captured': { icon: Zap, bar: 'bg-[#74FFAC]', text: 'text-[#74FFAC]' },
 };
 
 export default function CategoryBreakdownCard({ transactions = [], selectedCurrency = 'USD' }) {

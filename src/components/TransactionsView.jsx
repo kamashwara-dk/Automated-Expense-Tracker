@@ -29,6 +29,7 @@ const CATEGORY_CONFIGS = {
   'Subscriptions': { icon: Tv, badge: 'bg-[#FF4885]/10 text-[#FF4885] border-[#FF4885]/20' },
   'Healthcare': { icon: HeartPulse, badge: 'bg-[#74FFAC]/10 text-[#74FFAC] border-[#74FFAC]/20' },
   'Other': { icon: Tag, badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
+  'Auto-Captured': { icon: Zap, badge: 'bg-[#74FFAC]/10 text-[#74FFAC] border-[#74FFAC]/20' },
 };
 
 const CATEGORY_FILTERS = [
