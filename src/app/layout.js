@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "AutoSpend - Automated Expense Tracker",
+  title: "My Valuta - Automated Expense Tracker",
   description: "Track and automate your personal expenses effortlessly with real-time financial intelligence",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AutoSpend",
+    title: "My Valuta",
     startupImage: [
       { url: "/icon-512.png", media: "(device-width: 390px) and (device-height: 844px)" },
     ],
@@ -57,7 +57,7 @@ export default function RootLayout({ children }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="AutoSpend" />
+        <meta name="apple-mobile-web-app-title" content="My Valuta" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#070b12] text-slate-50">
@@ -72,10 +72,10 @@ export default function RootLayout({ children }) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js', { scope: '/' })
                     .then(function(reg) {
-                      console.log('[AutoSpend] SW registered:', reg.scope);
+                      console.log('[MyValuta] SW registered:', reg.scope);
                     })
                     .catch(function(err) {
-                      console.warn('[AutoSpend] SW registration failed:', err);
+                      console.warn('[MyValuta] SW registration failed:', err);
                     });
                 });
               }

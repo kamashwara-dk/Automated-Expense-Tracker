@@ -21,7 +21,7 @@ export default function InstallPwaBanner() {
     }
 
     // Check if dismissed before
-    const dismissed = sessionStorage.getItem('autospend-pwa-dismissed');
+    const dismissed = sessionStorage.getItem('myvaluta-pwa-dismissed');
     if (dismissed) {
       setIsDismissed(true);
       return;
@@ -67,7 +67,7 @@ export default function InstallPwaBanner() {
 
   const handleDismiss = () => {
     setIsDismissed(true);
-    sessionStorage.setItem('autospend-pwa-dismissed', '1');
+    sessionStorage.setItem('myvaluta-pwa-dismissed', '1');
   };
 
   if (isStandalone || isDismissed) return null;
@@ -83,7 +83,7 @@ export default function InstallPwaBanner() {
             </div>
             <div>
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-100">
-                <span>Install AutoSpend</span>
+                <span>Install My Valuta</span>
                 <Sparkles className="w-3 h-3 text-[#74FFAC]" />
               </div>
               <p className="text-[11px] text-slate-400">
@@ -129,7 +129,7 @@ export default function InstallPwaBanner() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-[#74FFAC]/10 border border-[#74FFAC]/20 text-[#74FFAC] flex items-center justify-center font-bold shrink-0 text-[10px]">3</span>
-                <span>Tap <strong className="text-slate-100">Add</strong> to confirm. AutoSpend will appear on your home screen.</span>
+                <span>Tap <strong className="text-slate-100">Add</strong> to confirm. My Valuta will appear on your home screen.</span>
               </li>
             </ol>
             <button type="button" onClick={() => setShowIOSInstructions(false)}

@@ -20,7 +20,7 @@ import { useLocalStorage } from '@/lib/useLocalStorage';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
-  const [selectedCurrency, setSelectedCurrency, currencyHydrated] = useLocalStorage('autospend-currency', 'USD');
+  const [selectedCurrency, setSelectedCurrency, currencyHydrated] = useLocalStorage('myvaluta-currency', 'USD');
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDataLoading, setIsDataLoading] = useState(false);
@@ -227,7 +227,7 @@ export default function Home() {
           <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '120ms' }} />
           <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '240ms' }} />
         </div>
-        <p className="text-slate-500 text-xs">Loading AutoSpend...</p>
+        <p className="text-slate-500 text-xs">Loading My Valuta...</p>
       </div>
     );
   }
@@ -261,7 +261,7 @@ export default function Home() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-extrabold text-white">Auto<span className="text-[#74FFAC]">Spend</span></p>
+                <p className="text-sm font-extrabold text-white">My <span className="text-[#74FFAC]">Valuta</span></p>
                 <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{currentUser?.email}</p>
               </div>
             </div>

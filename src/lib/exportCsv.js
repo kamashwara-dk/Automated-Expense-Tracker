@@ -22,7 +22,7 @@ export function exportTransactionsToCsv(transactions = [], currencyCode = 'USD')
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `autospend_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `myvaluta_export_${new Date().toISOString().split('T')[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -1,4 +1,4 @@
-# AutoSpend — Automated Expense Tracker
+# My Valuta — Automated Expense Tracker
 
 A mobile-first PWA for automated personal expense tracking with real-time financial intelligence.
 

@@ -1,9 +1,9 @@
 /**
- * AutoSpend Service Worker
+ * My Valuta Service Worker
  * Handles offline caching and background sync for the PWA.
  */
 
-const CACHE_VERSION = 'autospend-v2';
+const CACHE_VERSION = 'myvaluta-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
@@ -114,11 +114,11 @@ self.addEventListener('push', (event) => {
   try {
     const data = event.data.json();
     event.waitUntil(
-      self.registration.showNotification(data.title || 'AutoSpend', {
+      self.registration.showNotification(data.title || 'My Valuta', {
         body: data.body || 'You have a new expense notification.',
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: data.tag || 'autospend-notification',
+        tag: data.tag || 'myvaluta-notification',
         data: data.url ? { url: data.url } : {},
       })
     );

@@ -1,6 +1,6 @@
 {
-  "name": "AutoSpend - Automated Expense Tracker",
-  "short_name": "AutoSpend",
+  "name": "My Valuta - Automated Expense Tracker",
+  "short_name": "My Valuta",
   "description": "Smart, automated personal expense tracking and financial insights app.",
   "start_url": "/",
   "display": "standalone",

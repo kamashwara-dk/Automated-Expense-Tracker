@@ -21,7 +21,7 @@ export default function Header({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base lg:text-lg font-extrabold tracking-tight text-white">
-                Auto<span className="text-[#74FFAC]">Spend</span>
+                My <span className="text-[#74FFAC]">Valuta</span>
               </h1>
               <span className="px-1.5 py-0.5 rounded bg-[#74FFAC]/10 text-[#74FFAC] border border-[#74FFAC]/20 text-[10px] font-mono font-bold hidden sm:inline">
                 v1.0

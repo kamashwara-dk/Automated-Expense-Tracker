@@ -27,7 +27,7 @@ export default function LoginPage({ onLoginSuccess }) {
       setTimeout(() => {
         const demoUser = {
           id: 'demo-user-' + Date.now(),
-          email: email || 'demo@autospend.io',
+          email: email || 'demo@myvaluta.io',
           name: (email || 'demo').split('@')[0],
         };
         setStatusMessage({ type: 'success', text: 'Signed in successfully! Loading dashboard...' });
@@ -68,7 +68,7 @@ export default function LoginPage({ onLoginSuccess }) {
     setTimeout(() => {
       onLoginSuccess({
         id: 'guest-user',
-        email: 'guest@autospend.io',
+        email: 'guest@myvaluta.io',
         name: 'Guest User',
       });
     }, 400);
@@ -88,7 +88,7 @@ export default function LoginPage({ onLoginSuccess }) {
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight text-white">
-              Auto<span className="text-[#74FFAC]">Spend</span>
+              My <span className="text-[#74FFAC]">Valuta</span>
             </h1>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
               Automated Mobile Expense Tracking & Real-Time Financial Intelligence

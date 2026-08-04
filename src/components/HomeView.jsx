@@ -65,8 +65,8 @@ export default function HomeView({
   onDeleteTransaction,
 }) {
   // Persisted settings
-  const [budgetCap, setBudgetCap] = useLocalStorage('autospend-budget-cap', 500);
-  const [dailyAlertLimit, setDailyAlertLimit] = useLocalStorage('autospend-daily-limit', 50);
+  const [budgetCap, setBudgetCap] = useLocalStorage('myvaluta-budget-cap', 500);
+  const [dailyAlertLimit, setDailyAlertLimit] = useLocalStorage('myvaluta-daily-limit', 50);
 
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [tempBudgetInput, setTempBudgetInput] = useState('');
