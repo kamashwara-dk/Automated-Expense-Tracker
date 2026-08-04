@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1426"/>
+      <stop offset="100%" stop-color="#070b12"/>
+    </linearGradient>
+    <linearGradient id="vGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#55e89a"/>
+      <stop offset="100%" stop-color="#74FFAC"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="card">
+      <rect x="5" y="5" width="90" height="90" rx="22" ry="22"/>
+    </clipPath>
+  </defs>
+
+  <!-- Card background -->
+  <rect x="5" y="5" width="90" height="90" rx="22" ry="22" fill="url(#bg)"/>
+  <!-- Card border -->
+  <rect x="5" y="5" width="90" height="90" rx="22" ry="22" fill="none" stroke="rgba(116,255,172,0.18)" stroke-width="1"/>
+
+  <!-- Mint glow -->
+  <ellipse cx="50" cy="44" rx="28" ry="22" fill="#74FFAC" opacity="0.10" clip-path="url(#card)"/>
+
+  <!-- V shape -->
+  <g filter="url(#glow)" clip-path="url(#card)">
+    <polyline
+      points="20,24 50,70 80,24"
+      fill="none"
+      stroke="url(#vGrad)"
+      stroke-width="7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Trend spark line (on right arm) -->
+  <polyline
+    points="54,52 61,42 68,46 77,29"
+    fill="none"
+    stroke="white"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.92"
+    clip-path="url(#card)"
+  />
+  <!-- Spark peak dot -->
+  <circle cx="77" cy="29" r="3" fill="white" opacity="0.95" clip-path="url(#card)"/>
+
+  <!-- Bottom accent dots -->
+  <circle cx="41" cy="82" r="2.5" fill="#74FFAC"/>
+  <circle cx="50" cy="82" r="2.5" fill="#FF4885"/>
+  <circle cx="59" cy="82" r="2.5" fill="#74FFAC"/>
+</svg>

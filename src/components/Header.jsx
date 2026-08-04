@@ -1,7 +1,8 @@
 'use client';
 
-import { Sparkles, Code2, User } from 'lucide-react';
+import { Code2, User } from 'lucide-react';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
+import ValutaLogo from '@/components/ValutaLogo';
 
 export default function Header({
   selectedCurrency = 'USD',
@@ -15,9 +16,7 @@ export default function Header({
       <div className="max-w-screen-xl mx-auto px-4 lg:px-8 py-3 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 border border-[#74FFAC]/30 flex items-center justify-center text-[#74FFAC] shadow-sm shrink-0">
-            <Sparkles className="w-4 h-4" />
-          </div>
+          <ValutaLogo size={38} className="shrink-0 drop-shadow-[0_0_8px_rgba(116,255,172,0.4)]" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base lg:text-lg font-extrabold tracking-tight text-white">

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Mail, Lock, LogIn, UserPlus, ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Zap } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Zap } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import ValutaLogo from '@/components/ValutaLogo';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [mode, setMode] = useState('login');
@@ -83,8 +84,8 @@ export default function LoginPage({ onLoginSuccess }) {
       <div className="w-full max-w-md space-y-6 relative z-10">
         {/* Brand Header */}
         <div className="text-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#74FFAC] via-emerald-400 to-[#FF4885] flex items-center justify-center text-slate-950 mx-auto shadow-xl shadow-[#74FFAC]/20 border border-[#74FFAC]/30 font-bold">
-            <Sparkles className="w-7 h-7" />
+          <div className="mx-auto w-fit drop-shadow-[0_0_24px_rgba(116,255,172,0.35)]">
+            <ValutaLogo size={72} />
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight text-white">

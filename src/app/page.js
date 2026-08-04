@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus } from 'lucide-react';
+import ValutaLogo from '@/components/ValutaLogo';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import ManualEntryModal from '@/components/ManualEntryModal';
@@ -216,11 +217,8 @@ export default function Home() {
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-[#070b12] flex flex-col items-center justify-center gap-3">
-        {/* Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#74FFAC] via-emerald-400 to-[#FF4885] flex items-center justify-center text-slate-950 shadow-xl shadow-[#74FFAC]/20 animate-pulse">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
+        <div className="drop-shadow-[0_0_24px_rgba(116,255,172,0.5)] animate-pulse">
+          <ValutaLogo size={72} />
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -255,11 +253,7 @@ export default function Home() {
         <aside className="hidden lg:flex flex-col gap-4 w-64 xl:w-72 pt-8 shrink-0 sticky top-16 h-[calc(100vh-4rem)]">
           <div className="glass-card rounded-3xl p-5 border border-slate-800 space-y-1">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#74FFAC] to-emerald-400 flex items-center justify-center text-slate-950">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
+              <ValutaLogo size={40} className="shrink-0" />
               <div>
                 <p className="text-sm font-extrabold text-white">My <span className="text-[#74FFAC]">Valuta</span></p>
                 <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{currentUser?.email}</p>
