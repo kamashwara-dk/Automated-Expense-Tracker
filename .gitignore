@@ -30,6 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# local build/deploy logs
+build_out.txt
+vercel_out.txt
+
 # dev utilities
 test_webhook.ps1
 scripts/
