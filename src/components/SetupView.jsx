@@ -229,22 +229,16 @@ export default function SetupView({ currentUser }) {
           </SetupStep>
 
           <SetupStep number="2">
-            Download the official{' '}
-            <span className="inline-flex items-center gap-1.5 flex-wrap">
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                title="Shortcut link coming soon"
-                className="text-[#74FFAC] font-semibold underline underline-offset-2 inline-flex items-center gap-1"
-              >
-                Valuta Apple Shortcut
-                <Link2 className="w-3 h-3" />
-              </a>
-              <span className="text-[10px] text-slate-500 font-mono bg-slate-800 px-1.5 py-0.5 rounded">
-                link coming soon
-              </span>
-            </span>
-            {' '}from iCloud Shortcuts.
+            Download the official Valuta Apple Shortcut from iCloud:{' '}
+            <a
+              href="https://www.icloud.com/shortcuts/b6a3722dc9f34c5c97424608e48c5bae"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-2 px-3.5 py-2 rounded-xl bg-[#74FFAC]/10 hover:bg-[#74FFAC]/20 border border-[#74FFAC]/30 text-[#74FFAC] text-xs font-bold transition-colors"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              Get Valuta Shortcut
+            </a>
           </SetupStep>
 
           <SetupStep number="3">
