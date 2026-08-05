@@ -13,6 +13,7 @@ import LoginPage from '@/components/LoginPage';
 import HomeView from '@/components/HomeView';
 import TransactionsView from '@/components/TransactionsView';
 import InsightsView from '@/components/InsightsView';
+import SetupView from '@/components/SetupView';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { ToastContainer, useToast } from '@/components/Toast';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -263,6 +264,7 @@ export default function Home() {
               { id: 'home', label: 'Dashboard', icon: '⬡' },
               { id: 'insights', label: 'Insights', icon: '◈' },
               { id: 'transactions', label: 'History', icon: '≡' },
+              { id: 'setup', label: 'Setup Automation', icon: '⚡' },
             ].map((item) => (
               <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
@@ -303,6 +305,8 @@ export default function Home() {
                 transactions={transactions}
                 selectedCurrency={selectedCurrency}
               />
+            ) : activeTab === 'setup' ? (
+              <SetupView currentUser={currentUser} />
             ) : (
               <TransactionsView
                 transactions={transactions}

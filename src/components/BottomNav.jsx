@@ -1,13 +1,13 @@
 'use client';
 
-import { Home, ArrowLeftRight, Plus, BarChart2 } from 'lucide-react';
+import { Home, ArrowLeftRight, Plus, BarChart2, Zap } from 'lucide-react';
 
 function NavTab({ icon: Icon, label, active, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-0.5 py-1 px-4 rounded-xl transition-all duration-200 min-w-[60px] touch-target ${
+      className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-200 min-w-[52px] touch-target ${
         active ? 'text-[#74FFAC]' : 'text-slate-400 hover:text-slate-200'
       }`}
     >
@@ -21,7 +21,6 @@ function NavTab({ icon: Icon, label, active, onClick }) {
 export default function BottomNav({ activeTab, onTabChange, onFabClick }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass-nav border-t border-slate-800/60 shadow-2xl">
-      {/* Constrain to same width as content — looks right on desktop too */}
       <div className="max-w-lg mx-auto px-2 pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex items-center justify-around h-16">
 
@@ -41,7 +40,7 @@ export default function BottomNav({ activeTab, onTabChange, onFabClick }) {
             onClick={() => onTabChange('insights')}
           />
 
-          {/* FAB — its own dedicated slot, NOT absolute positioned */}
+          {/* FAB — centred raised button */}
           <div className="flex flex-col items-center justify-center -mt-5">
             <button
               type="button"
@@ -62,8 +61,13 @@ export default function BottomNav({ activeTab, onTabChange, onFabClick }) {
             onClick={() => onTabChange('transactions')}
           />
 
-          {/* Spacer to balance the layout on wide screens */}
-          <div className="w-[60px] hidden sm:block" />
+          {/* Setup Automation */}
+          <NavTab
+            icon={Zap}
+            label="Setup"
+            active={activeTab === 'setup'}
+            onClick={() => onTabChange('setup')}
+          />
 
         </div>
       </div>

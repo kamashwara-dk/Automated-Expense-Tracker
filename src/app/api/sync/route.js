@@ -1,5 +1,20 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+
+/**
+ * Server-side admin client that bypasses RLS.
+ * Used only for the sync_token → user_id lookup so the webhook
+ * can authenticate without being tied to a logged-in session.
+ */
+const supabaseAdmin =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { persistSession: false } }
+      )
+    : null;
 
 export async function GET() {
   return NextResponse.json({ success: true, message: "Valuta API is live." });
@@ -16,47 +31,93 @@ export async function OPTIONS() {
   });
 }
 
+/**
+ * Resolve a sync_token string to the owning user_id.
+ * Uses the service-role client so it can read profiles regardless of RLS.
+ * Returns null if the token is not found or the admin client is unavailable.
+ */
+async function resolveUserIdFromToken(token) {
+  if (!token || !supabaseAdmin) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('sync_token', token)
+    .single();
+
+  if (error || !data?.id) {
+    console.warn('sync_token not found in profiles:', error?.message);
+    return null;
+  }
+
+  return data.id;
+}
+
 export async function POST(req) {
   try {
     const bodyText = await req.text();
-    console.log("Raw Incoming Body:", bodyText); // This will show up in Vercel Logs!
+    console.log("Raw Incoming Body:", bodyText);
 
     let body;
     try {
       body = JSON.parse(bodyText);
     } catch (e) {
-      // JSON parse failed — treat entire body as raw_sms instead of returning 400
       console.log("JSON parse failed, treating body as raw_sms:", bodyText.substring(0, 80));
       body = { raw_sms: bodyText };
     }
 
-    // Default fallback values
+    // ── Token Authentication ─────────────────────────────────────────────────
+    // Accept token from:
+    //   1. Authorization: Bearer <token>  header
+    //   2. body.sync_token  JSON field
+    // Fall back to legacy body.user_id for backward-compat (dev/testing only).
+    let resolvedUserId = null;
+
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+    const bodyToken = body.sync_token ? String(body.sync_token).trim() : null;
+
+    const incomingToken = bearerToken || bodyToken;
+
+    if (incomingToken) {
+      resolvedUserId = await resolveUserIdFromToken(incomingToken);
+      if (!resolvedUserId) {
+        console.warn('Invalid or unrecognised sync_token provided.');
+        // Still continue — we'll store without a user_id rather than break the caller's Shortcut
+      }
+    } else if (body.user_id && typeof body.user_id === 'string' && body.user_id.trim()) {
+      // Legacy path: raw user_id sent directly (kept for dev convenience)
+      resolvedUserId = body.user_id.trim();
+      console.log("Using legacy user_id field:", resolvedUserId);
+    }
+
+    // ── SMS Parsing ───────────────────────────────────────────────────────────
     let parsedAmount = 0;
     let parsedMerchant = "Unknown Merchant";
     let parsedCategory = "Auto-Captured";
 
     if (body.raw_sms) {
-      // Attempt basic regex parsing, but don't fail if it doesn't match
       const text = body.raw_sms;
-      const amountMatch = text.match(/Rs\.?\s*([\d,]+\.?\d*)/i);
+
+      const amountMatch = text.match(/(?:Rs\.?|INR)\s*([\d,]+\.?\d*)/i);
       if (amountMatch) {
         parsedAmount = parseFloat(amountMatch[1].replace(/,/g, ''));
       }
 
-      const merchantMatch = text.match(/to\s+([A-Za-z0-9\s]+?)(?:\.|\s+UPI|\s+Ref)/i);
+      const merchantMatch = text.match(/To\s+(.+)/i);
       if (merchantMatch) {
         parsedMerchant = merchantMatch[1].trim();
       } else {
-        // If merchant regex fails, save the raw text so we can debug it on the dashboard
         parsedMerchant = "Unparsed: " + text.substring(0, 25);
       }
     } else {
-      // Handle structured manual entry format
+      // Structured manual-entry format
       parsedAmount = parseFloat(body.amount) || 0;
       parsedMerchant = body.merchant || "Manual Entry";
       parsedCategory = body.category || "General";
     }
 
+    // ── Build Transaction ─────────────────────────────────────────────────────
     const transactionData = {
       amount:   parsedAmount,
       merchant: parsedMerchant,
@@ -64,19 +125,19 @@ export async function POST(req) {
       date:     body.date || new Date().toISOString(),
     };
 
-    // Add user_id if provided
-    if (body.user_id && typeof body.user_id === 'string' && body.user_id.trim()) {
-      transactionData.user_id = body.user_id.trim();
+    if (resolvedUserId) {
+      transactionData.user_id = resolvedUserId;
     }
 
     console.log("Transaction to insert:", JSON.stringify(transactionData));
 
-    // Insert into Supabase
+    // ── Persist to Supabase ───────────────────────────────────────────────────
     if (isSupabaseConfigured) {
-      const { error } = await supabase.from('transactions').insert([transactionData]);
+      // Use the admin client so the insert works regardless of RLS policies
+      const client = supabaseAdmin || supabase;
+      const { error } = await client.from('transactions').insert([transactionData]);
       if (error) {
         console.error("Supabase Error:", error.message);
-        // Still return 200 — don't fail the Shortcut
       } else {
         console.log("Supabase insert successful");
       }
@@ -84,7 +145,7 @@ export async function POST(req) {
       console.log("Supabase not configured — local mode");
     }
 
-    // ALWAYS return 200 OK
+    // ALWAYS return 200 OK so the caller's Shortcut/Tasker action doesn't fail
     return NextResponse.json(
       { success: true, data: transactionData },
       {
