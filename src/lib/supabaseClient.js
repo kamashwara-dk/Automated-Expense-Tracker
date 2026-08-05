@@ -12,5 +12,12 @@ export const isSupabaseConfigured = Boolean(
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,       // store session in localStorage so it survives refresh
+      detectSessionInUrl: true,   // pick up OAuth/magic-link tokens from the URL
+      autoRefreshToken: true,     // silently refresh expired JWTs
+    },
+  }
 );

@@ -1,41 +1,42 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { isSupabaseConfigured } from '@/lib/supabaseClient';
 
-/**
- * Server-side admin client that bypasses RLS.
- * Used only for the sync_token → user_id lookup so the webhook
- * can authenticate without being tied to a logged-in session.
- */
+// ── Service-role admin client (bypasses RLS) ──────────────────────────────────
+// Used for:
+//   1. profiles lookup  → sync_token → user_id   (auth check)
+//   2. transactions insert                        (write on behalf of any user)
+//
+// Both NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in
+// Vercel environment variables.  The service-role key is NEVER exposed to the
+// browser — it only lives in this server-side route.
 const supabaseAdmin =
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY,
-        { auth: { persistSession: false } }
+        { auth: { persistSession: false, autoRefreshToken: false } }
       )
     : null;
 
+// ── CORS headers reused across responses ─────────────────────────────────────
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Requested-With',
+};
+
 export async function GET() {
-  return NextResponse.json({ success: true, message: "Valuta API is live." });
+  return NextResponse.json({ success: true, message: 'Valuta API is live.' });
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Requested-With',
-    },
-  });
+  return new NextResponse(null, { status: 204, headers: CORS });
 }
 
-/**
- * Resolve a sync_token string to the owning user_id.
- * Uses the service-role client so it can read profiles regardless of RLS.
- * Returns null if the token is not found or the admin client is unavailable.
- */
+// ── Token → user_id resolver ──────────────────────────────────────────────────
+// Queries public.profiles using the service-role client so RLS is bypassed.
+// Returns the user's UUID on success, or null on any failure.
 async function resolveUserIdFromToken(token) {
   if (!token || !supabaseAdmin) return null;
 
@@ -45,56 +46,71 @@ async function resolveUserIdFromToken(token) {
     .eq('sync_token', token)
     .single();
 
-  if (error || !data?.id) {
-    console.warn('sync_token not found in profiles:', error?.message);
+  if (error) {
+    // code PGRST116 = no rows matched — expected for invalid tokens
+    console.warn('Token lookup failed:', error.code, error.message);
     return null;
   }
 
-  return data.id;
+  return data?.id ?? null;
 }
 
+// ── POST /api/sync ────────────────────────────────────────────────────────────
 export async function POST(req) {
   try {
     const bodyText = await req.text();
-    console.log("Raw Incoming Body:", bodyText);
+    console.log('Raw Incoming Body:', bodyText.substring(0, 200));
 
     let body;
     try {
       body = JSON.parse(bodyText);
-    } catch (e) {
-      console.log("JSON parse failed, treating body as raw_sms:", bodyText.substring(0, 80));
+    } catch {
+      // Plain-text body — treat the whole thing as raw_sms
       body = { raw_sms: bodyText };
     }
 
-    // ── Token Authentication ─────────────────────────────────────────────────
-    // Accept token from:
-    //   1. Authorization: Bearer <token>  header
-    //   2. body.sync_token  JSON field
-    // Fall back to legacy body.user_id for backward-compat (dev/testing only).
-    let resolvedUserId = null;
-
-    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
-    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-    const bodyToken = body.sync_token ? String(body.sync_token).trim() : null;
-
+    // ── 1. Authenticate via sync_token ──────────────────────────────────────
+    // Accept token from either:
+    //   a) Authorization: Bearer <token>  header
+    //   b) body.sync_token                JSON field
+    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+    const bodyToken   = body.sync_token ? String(body.sync_token).trim() : null;
     const incomingToken = bearerToken || bodyToken;
 
-    if (incomingToken) {
-      resolvedUserId = await resolveUserIdFromToken(incomingToken);
-      if (!resolvedUserId) {
-        console.warn('Invalid or unrecognised sync_token provided.');
-        // Still continue — we'll store without a user_id rather than break the caller's Shortcut
-      }
-    } else if (body.user_id && typeof body.user_id === 'string' && body.user_id.trim()) {
-      // Legacy path: raw user_id sent directly (kept for dev convenience)
-      resolvedUserId = body.user_id.trim();
-      console.log("Using legacy user_id field:", resolvedUserId);
+    if (!incomingToken) {
+      console.warn('Request rejected: no sync_token provided');
+      return NextResponse.json(
+        { error: 'Unauthorized: sync_token is required' },
+        { status: 401, headers: CORS }
+      );
     }
 
-    // ── SMS Parsing ───────────────────────────────────────────────────────────
-    let parsedAmount = 0;
-    let parsedMerchant = "Unknown Merchant";
-    let parsedCategory = "Auto-Captured";
+    if (!supabaseAdmin) {
+      // Service role key is missing — hard fail rather than silently misbehave
+      console.error('supabaseAdmin is null — SUPABASE_SERVICE_ROLE_KEY is not set');
+      return NextResponse.json(
+        { error: 'Server misconfiguration' },
+        { status: 500, headers: CORS }
+      );
+    }
+
+    const resolvedUserId = await resolveUserIdFromToken(incomingToken);
+
+    if (!resolvedUserId) {
+      console.warn('Request rejected: sync_token not found in profiles table');
+      return NextResponse.json(
+        { error: 'Unauthorized: invalid or unrecognised sync_token' },
+        { status: 401, headers: CORS }
+      );
+    }
+
+    console.log('Authenticated user:', resolvedUserId);
+
+    // ── 2. Parse the incoming payload ───────────────────────────────────────
+    let parsedAmount   = 0;
+    let parsedMerchant = 'Unknown Merchant';
+    let parsedCategory = 'Auto-Captured';
 
     if (body.raw_sms) {
       const text = body.raw_sms;
@@ -108,54 +124,51 @@ export async function POST(req) {
       if (merchantMatch) {
         parsedMerchant = merchantMatch[1].trim();
       } else {
-        parsedMerchant = "Unparsed: " + text.substring(0, 25);
+        parsedMerchant = 'Unparsed: ' + text.substring(0, 25);
       }
     } else {
-      // Structured manual-entry format
-      parsedAmount = parseFloat(body.amount) || 0;
-      parsedMerchant = body.merchant || "Manual Entry";
-      parsedCategory = body.category || "General";
+      // Structured manual-entry format (amount/merchant/category fields)
+      parsedAmount   = parseFloat(body.amount)   || 0;
+      parsedMerchant = body.merchant              || 'Manual Entry';
+      parsedCategory = body.category              || 'General';
     }
 
-    // ── Build Transaction ─────────────────────────────────────────────────────
+    // ── 3. Build and insert the transaction ─────────────────────────────────
     const transactionData = {
+      user_id:  resolvedUserId,
       amount:   parsedAmount,
       merchant: parsedMerchant,
       category: parsedCategory,
       date:     body.date || new Date().toISOString(),
     };
 
-    if (resolvedUserId) {
-      transactionData.user_id = resolvedUserId;
-    }
+    console.log('Inserting transaction:', JSON.stringify(transactionData));
 
-    console.log("Transaction to insert:", JSON.stringify(transactionData));
-
-    // ── Persist to Supabase ───────────────────────────────────────────────────
     if (isSupabaseConfigured) {
-      // Use the admin client so the insert works regardless of RLS policies
-      const client = supabaseAdmin || supabase;
-      const { error } = await client.from('transactions').insert([transactionData]);
-      if (error) {
-        console.error("Supabase Error:", error.message);
+      const { error: insertError } = await supabaseAdmin
+        .from('transactions')
+        .insert([transactionData]);
+
+      if (insertError) {
+        console.error('Supabase insert error:', insertError.message);
+        // Return 200 anyway so the caller's Shortcut/MacroDroid action doesn't retry
       } else {
-        console.log("Supabase insert successful");
+        console.log('Transaction inserted successfully');
       }
     } else {
-      console.log("Supabase not configured — local mode");
+      console.log('Supabase not configured — skipping insert');
     }
 
-    // ALWAYS return 200 OK so the caller's Shortcut/Tasker action doesn't fail
     return NextResponse.json(
       { success: true, data: transactionData },
-      {
-        status: 200,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-      }
+      { status: 200, headers: CORS }
     );
 
-  } catch (error) {
-    console.error("Critical API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (err) {
+    console.error('Critical API Error:', err);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500, headers: CORS }
+    );
   }
 }

@@ -50,11 +50,11 @@ export default function Home() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUser(session?.user ?? null);
-      setIsAuthLoading(false);
-    });
-
+    // onAuthStateChange fires with INITIAL_SESSION on mount, which includes
+    // the persisted session from localStorage — no need for a separate getSession call.
+    // Using this as the single source of truth avoids a race condition where
+    // getSession() and onAuthStateChange both set currentUser and double-trigger
+    // the transaction fetch, sometimes before the client session is fully attached.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCurrentUser(session?.user ?? null);
       setIsAuthLoading(false);
@@ -75,11 +75,12 @@ export default function Home() {
           .eq('user_id', currentUser.id)
           .order('date', { ascending: false });
 
-        if (!error && data) {
-          setTransactions(data);
-        } else if (error) {
-          console.error('Error loading transactions:', error.message);
+        if (error) {
+          console.error('Error loading transactions:', error.message, '| code:', error.code);
           toast.error('Failed to load transactions from cloud.');
+        } else {
+          console.log(`Loaded ${data?.length ?? 0} transactions for user ${currentUser.id}`);
+          setTransactions(data ?? []);
         }
       } catch (err) {
         console.error('Failed to load user transactions:', err);
@@ -98,7 +99,7 @@ export default function Home() {
     if (!isSupabaseConfigured || !currentUser?.id) return;
 
     const channel = supabase
-      .channel('transactions-realtime')
+      .channel(`transactions-realtime-${currentUser.id}`)
       .on(
         'postgres_changes',
         {
@@ -110,14 +111,49 @@ export default function Home() {
         (payload) => {
           const newTx = payload.new;
           setTransactions((prev) => {
-            // Avoid duplicates (may already be added optimistically)
             if (prev.some((t) => t.id === newTx.id)) return prev;
             return [newTx, ...prev];
           });
           toast.info(`New transaction synced: ${newTx.merchant}`);
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          setTransactions((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const deletedId = payload.old?.id;
+          if (deletedId) {
+            setTransactions((prev) => prev.filter((t) => t.id !== deletedId));
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime: subscribed to transactions for', currentUser.id);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Realtime subscription error:', status, err);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
