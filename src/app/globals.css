@@ -1,20 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #070b12;
-  --foreground: #f8fafc;
-  --color-mint: #74FFAC;
-  --color-pink: #FF4885;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* ── Theme tokens (overridden at runtime by useTheme hook) ── */
+  --background:    #070b12;
+  --bg-card:       rgba(15, 23, 42, 0.55);
+  --bg-header:     rgba(7, 11, 18, 0.88);
+  --bg-nav:        rgba(7, 11, 18, 0.92);
+  --bg-modal:      rgba(10, 15, 26, 0.97);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+
+  /* ── Accent tokens (overridden at runtime by useTheme hook) ── */
+  --accent:        #74FFAC;
+  --accent-dim:    rgba(116, 255, 172, 0.15);
+  --accent-rgb:    116, 255, 172;
+
+  /* ── Fixed tokens ── */
+  --foreground:    #f8fafc;
+  --color-pink:    #FF4885;
+  --font-mono:     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-mint: #74FFAC;
-  --color-pink: #FF4885;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-mono);
+  --color-mint:       var(--accent);
+  --color-pink:       #FF4885;
+  --font-sans:        var(--font-geist-sans);
+  --font-mono:        var(--font-mono);
 }
 
 body {
@@ -22,9 +34,9 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden;
-  /* Allow text selection for copyable financial data */
   user-select: text;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.3s ease;
 }
 
 /* Prevent selection only on interactive UI chrome (buttons, nav, icons) */
@@ -41,30 +53,13 @@ nav,
   -webkit-user-select: text;
 }
 
-/* Custom Theme Utilities */
-.text-mint {
-  color: #74FFAC;
-}
-
-.bg-mint {
-  background-color: #74FFAC;
-}
-
-.border-mint {
-  border-color: #74FFAC;
-}
-
-.text-pink {
-  color: #FF4885;
-}
-
-.bg-pink {
-  background-color: #FF4885;
-}
-
-.border-pink {
-  border-color: #FF4885;
-}
+/* Custom Theme Utilities — driven by CSS variables */
+.text-mint   { color: var(--accent); }
+.bg-mint     { background-color: var(--accent); }
+.border-mint { border-color: var(--accent); }
+.text-pink   { color: #FF4885; }
+.bg-pink     { background-color: #FF4885; }
+.border-pink { border-color: #FF4885; }
 
 /* Monospace / Tabular numbers for financial metrics */
 .num-tabular {
@@ -74,24 +69,24 @@ nav,
 
 /* Modern Fintech Glass & Card System */
 .glass-header {
-  background: rgba(7, 11, 18, 0.88);
+  background: var(--bg-header);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .glass-nav {
-  background: rgba(7, 11, 18, 0.92);
+  background: var(--bg-nav);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .glass-card {
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-subtle);
 }
 
 .glass-card-hover {
@@ -100,12 +95,12 @@ nav,
 
 .glass-card-hover:hover {
   background: rgba(30, 41, 59, 0.65);
-  border-color: rgba(116, 255, 172, 0.25);
+  border-color: rgba(var(--accent-rgb), 0.25);
   transform: translateY(-1px);
 }
 
 .glass-modal {
-  background: rgba(10, 15, 26, 0.97);
+  background: var(--bg-modal);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -113,11 +108,11 @@ nav,
 
 /* Button & FAB accents */
 .fab-shadow {
-  box-shadow: 0 8px 24px -4px rgba(116, 255, 172, 0.45), 0 2px 6px -1px rgba(255, 72, 133, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(var(--accent-rgb), 0.45), 0 2px 6px -1px rgba(255, 72, 133, 0.35);
 }
 
 .fab-shadow:active {
-  box-shadow: 0 4px 14px -2px rgba(116, 255, 172, 0.6);
+  box-shadow: 0 4px 14px -2px rgba(var(--accent-rgb), 0.6);
 }
 
 /* Animations */
@@ -137,8 +132,8 @@ nav,
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(116, 255, 172, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(116, 255, 172, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0); }
 }
 
 @keyframes shimmer {
@@ -205,7 +200,7 @@ nav,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(116, 255, 172, 0.2);
+  background: rgba(var(--accent-rgb), 0.2);
   border-radius: 9999px;
 }
 .no-scrollbar::-webkit-scrollbar {
@@ -253,3 +248,99 @@ nav,
 .confirm-dialog {
   animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ACCENT OVERRIDE LAYER
+   Tailwind compiles arbitrary values like text-[#74FFAC] to static CSS at
+   build time. When the user changes accent colour at runtime, these selectors
+   override those static values using the live CSS variable.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Text colour overrides */
+[class*="text-\[#74FFAC\]"],
+[class*="text-[#74FFAC]"] {
+  color: var(--accent) !important;
+}
+
+/* Background colour overrides — solid */
+[class*="bg-\[#74FFAC\]"],
+[class*="bg-[#74FFAC]"] {
+  background-color: var(--accent) !important;
+}
+
+/* Border colour overrides */
+[class*="border-\[#74FFAC\]"],
+[class*="border-[#74FFAC]"] {
+  border-color: var(--accent) !important;
+}
+
+/* Shadow colour overrides (box-shadow with accent) */
+[class*="shadow-\[#74FFAC\]"],
+[class*="shadow-[#74FFAC]"] {
+  --tw-shadow-color: var(--accent) !important;
+}
+
+/* Ring colour overrides */
+[class*="ring-\[#74FFAC\]"],
+[class*="ring-[#74FFAC]"] {
+  --tw-ring-color: var(--accent) !important;
+}
+
+/* Opacity variants — bg-[#74FFAC]/10, /20, etc. */
+[class*="bg-\[#74FFAC\]\/"],
+[class*="bg-[#74FFAC]/"] {
+  background-color: rgba(var(--accent-rgb), var(--tw-bg-opacity, 0.1)) !important;
+}
+
+/* Border opacity variants */
+[class*="border-\[#74FFAC\]\/"],
+[class*="border-[#74FFAC]/"] {
+  border-color: rgba(var(--accent-rgb), 0.2) !important;
+}
+
+/* Specific opacity classes used frequently */
+.bg-\[\#74FFAC\]\/5  { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+.bg-\[\#74FFAC\]\/8  { background-color: rgba(var(--accent-rgb), 0.08) !important; }
+.bg-\[\#74FFAC\]\/10 { background-color: rgba(var(--accent-rgb), 0.10) !important; }
+.bg-\[\#74FFAC\]\/15 { background-color: rgba(var(--accent-rgb), 0.15) !important; }
+.bg-\[\#74FFAC\]\/20 { background-color: rgba(var(--accent-rgb), 0.20) !important; }
+.bg-\[\#74FFAC\]\/25 { background-color: rgba(var(--accent-rgb), 0.25) !important; }
+.bg-\[\#74FFAC\]\/30 { background-color: rgba(var(--accent-rgb), 0.30) !important; }
+.bg-\[\#74FFAC\]\/40 { background-color: rgba(var(--accent-rgb), 0.40) !important; }
+.bg-\[\#74FFAC\]\/90 { background-color: rgba(var(--accent-rgb), 0.90) !important; }
+
+.border-\[\#74FFAC\]\/15 { border-color: rgba(var(--accent-rgb), 0.15) !important; }
+.border-\[\#74FFAC\]\/20 { border-color: rgba(var(--accent-rgb), 0.20) !important; }
+.border-\[\#74FFAC\]\/25 { border-color: rgba(var(--accent-rgb), 0.25) !important; }
+.border-\[\#74FFAC\]\/30 { border-color: rgba(var(--accent-rgb), 0.30) !important; }
+.border-\[\#74FFAC\]\/40 { border-color: rgba(var(--accent-rgb), 0.40) !important; }
+
+.text-\[\#74FFAC\] { color: var(--accent) !important; }
+.bg-\[\#74FFAC\]   { background-color: var(--accent) !important; }
+.border-\[\#74FFAC\] { border-color: var(--accent) !important; }
+
+/* Focus ring overrides */
+.focus\:border-\[\#74FFAC\]:focus { border-color: var(--accent) !important; }
+.focus\:ring-\[\#74FFAC\]:focus   { --tw-ring-color: var(--accent) !important; }
+
+/* Gradient overrides for FAB and buttons */
+.from-\[\#74FFAC\] { --tw-gradient-from: var(--accent) !important; }
+.to-\[\#74FFAC\]   { --tw-gradient-to: var(--accent) !important; }
+.via-\[\#74FFAC\]  { --tw-gradient-via: var(--accent) !important; }
+
+/* Shadow glow overrides */
+.shadow-\[\#74FFAC\]\/20 { --tw-shadow-color: rgba(var(--accent-rgb), 0.20) !important; }
+.shadow-\[0_0_6px_\#74FFAC\] { box-shadow: 0 0 6px var(--accent) !important; }
+
+/* Selection colour override */
+::selection {
+  background-color: var(--accent);
+  color: #0f172a;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BACKGROUND OVERRIDE LAYER
+   Override the hardcoded #070b12 used in various components.
+   ───────────────────────────────────────────────────────────────────────────── */
+.bg-\[\#070b12\]   { background-color: var(--background) !important; }
+.border-\[\#070b12\] { border-color: var(--background) !important; }

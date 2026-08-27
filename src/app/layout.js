@@ -64,8 +64,29 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="My Valuta" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        {/* Apply theme before first paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var THEMES={dark:{'--background':'#070b12','--bg-card':'rgba(15,23,42,0.55)','--bg-header':'rgba(7,11,18,0.88)','--bg-nav':'rgba(7,11,18,0.92)','--bg-modal':'rgba(10,15,26,0.97)','--border-subtle':'rgba(255,255,255,0.07)'},midnight:{'--background':'#03060f','--bg-card':'rgba(6,14,35,0.70)','--bg-header':'rgba(3,6,15,0.94)','--bg-nav':'rgba(3,6,15,0.96)','--bg-modal':'rgba(4,8,20,0.98)','--border-subtle':'rgba(80,100,200,0.10)'}};
+            var ACCENTS={mint:'#74FFAC',violet:'#a78bfa',sky:'#38bdf8',amber:'#fbbf24',rose:'#fb7185'};
+            function hexRgb(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)].join(',');}
+            try{
+              var t=JSON.parse(localStorage.getItem('myvaluta-theme'))||'dark';
+              var a=JSON.parse(localStorage.getItem('myvaluta-accent'))||'mint';
+              var tv=THEMES[t]||THEMES.dark;
+              var ah=ACCENTS[a]||ACCENTS.mint;
+              var ar=hexRgb(ah);
+              var r=document.documentElement;
+              Object.keys(tv).forEach(function(k){r.style.setProperty(k,tv[k]);});
+              r.style.setProperty('--accent',ah);
+              r.style.setProperty('--accent-rgb',ar);
+              r.style.setProperty('--accent-dim','rgba('+ar+',0.15)');
+              document.body&&(document.body.style.backgroundColor=tv['--background']);
+            }catch(e){}
+          })();
+        ` }} />
       </head>
-      <body className="min-h-full flex flex-col bg-[#070b12] text-slate-50">
+      <body className="min-h-full flex flex-col text-slate-50" style={{ backgroundColor: 'var(--background)' }}>
         {children}
         {/* Service Worker Registration */}
         <Script

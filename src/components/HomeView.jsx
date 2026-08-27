@@ -297,6 +297,7 @@ export default function HomeView({
           </div>
           <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Auto Insight</span>
         </div>
+
         {isEmpty ? (
           <div className="flex items-start gap-3 pt-1">
             <div className="p-2 rounded-xl bg-[#74FFAC]/10 border border-[#74FFAC]/20 text-[#74FFAC] shrink-0">
@@ -306,41 +307,109 @@ export default function HomeView({
               Start tracking to unlock spending insights and personalized financial intelligence.
             </p>
           </div>
-        ) : isDailyLimitExceeded ? (
-          <div className="flex items-start gap-3 pt-1">
-            <div className="p-2 rounded-xl bg-[#FF4885]/10 border border-[#FF4885]/20 text-[#FF4885] shrink-0">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-              <strong className="text-[#FF4885]">Daily limit exceeded!</strong> You&apos;ve spent {formatCurrency(todayTotal, selectedCurrency)} today, {formatCurrency(todayTotal - dailyAlertLimit, selectedCurrency)} over your limit.
-            </p>
-          </div>
-        ) : insightState === 'critical' ? (
-          <div className="flex items-start gap-3 pt-1">
-            <div className="p-2 rounded-xl bg-[#FF4885]/10 border border-[#FF4885]/20 text-[#FF4885] shrink-0">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-              Spending pace is <strong className="text-[#FF4885]">high</strong> — {formatCurrency(stats.current7Total, selectedCurrency)} over 7 days. Monthly budget at {budgetSpentPct.toFixed(0)}%.
-            </p>
-          </div>
-        ) : insightState === 'warning' ? (
-          <div className="flex items-start gap-3 pt-1">
-            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-              Velocity elevated — <strong className="text-amber-400">{formatCurrency(stats.current7Total, selectedCurrency)}</strong> over 7 days. Consider slowing discretionary spending.
-            </p>
-          </div>
         ) : (
-          <div className="flex items-start gap-3 pt-1">
-            <div className="p-2 rounded-xl bg-[#74FFAC]/10 border border-[#74FFAC]/20 text-[#74FFAC] shrink-0">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Spending is <strong className="text-[#74FFAC]">on track</strong> — within daily and monthly budget limits.
-            </p>
+          <div className="space-y-2 pt-1">
+            {/* Insight 1 — Daily limit */}
+            {isDailyLimitExceeded ? (
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
+                <AlertTriangle className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                  <strong className="text-[#FF4885]">Daily limit hit!</strong> You&apos;ve spent{' '}
+                  {formatCurrency(todayTotal, selectedCurrency)} today —{' '}
+                  {formatCurrency(todayTotal - dailyAlertLimit, selectedCurrency)} over your{' '}
+                  {formatCurrency(dailyAlertLimit, selectedCurrency)} limit.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#74FFAC]/8 border border-[#74FFAC]/15">
+                <CheckCircle2 className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                  Today&apos;s spend is <strong className="text-[#74FFAC]">{formatCurrency(todayTotal, selectedCurrency)}</strong> —{' '}
+                  {formatCurrency(dailyAlertLimit - todayTotal, selectedCurrency)} under your daily limit.
+                </p>
+              </div>
+            )}
+
+            {/* Insight 2 — Monthly budget */}
+            {budgetSpentPct > 90 ? (
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
+                <AlertTriangle className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                  <strong className="text-[#FF4885]">Budget almost exhausted</strong> — {budgetSpentPct.toFixed(0)}% used.
+                  Only {formatCurrency(Math.max(budgetRemaining, 0), selectedCurrency)} left this month.
+                </p>
+              </div>
+            ) : budgetSpentPct > 70 ? (
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                  Monthly budget is <strong className="text-amber-400">{budgetSpentPct.toFixed(0)}% used</strong>.{' '}
+                  {formatCurrency(budgetRemaining, selectedCurrency)} remaining — consider slowing discretionary spend.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <Target className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                  Monthly budget on track — <strong className="text-[#74FFAC]">{budgetSpentPct.toFixed(0)}% used</strong>,{' '}
+                  {formatCurrency(budgetRemaining, selectedCurrency)} remaining.
+                </p>
+              </div>
+            )}
+
+            {/* Insight 3 — Week-over-week trend */}
+            {stats.previous7Total > 0 && (
+              stats.pctChange > 15 ? (
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
+                  <TrendingUp className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                    Spending is <strong className="text-[#FF4885]">up {stats.pctChange.toFixed(1)}%</strong> vs last week
+                    ({formatCurrency(stats.current7Total, selectedCurrency)} vs{' '}
+                    {formatCurrency(stats.previous7Total, selectedCurrency)}).
+                  </p>
+                </div>
+              ) : stats.pctChange < -10 ? (
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#74FFAC]/8 border border-[#74FFAC]/15">
+                  <TrendingDown className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                    Great progress — spending is <strong className="text-[#74FFAC]">down {Math.abs(stats.pctChange).toFixed(1)}%</strong> vs last week.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                  <TrendingDown className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                    Week-on-week spend is <strong className="text-[#74FFAC]">stable</strong> —{' '}
+                    {formatCurrency(stats.current7Total, selectedCurrency)} this week vs{' '}
+                    {formatCurrency(stats.previous7Total, selectedCurrency)} last week.
+                  </p>
+                </div>
+              )
+            )}
+
+            {/* Insight 4 — Top category callout */}
+            {(() => {
+              const catTotals = {};
+              transactions.forEach((tx) => {
+                const cat = tx.category || 'Other';
+                catTotals[cat] = (catTotals[cat] || 0) + Number(tx.amount || 0);
+              });
+              const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
+              if (!topCat) return null;
+              const [name, amount] = topCat;
+              const pct = monthlyTotal > 0 ? (amount / monthlyTotal) * 100 : 0;
+              if (pct < 30) return null; // Only show if one category dominates
+              return (
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                  <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
+                    <strong className="text-slate-100">{name}</strong> accounts for{' '}
+                    <strong className="text-amber-400">{pct.toFixed(0)}%</strong> of your total spend
+                    ({formatCurrency(amount, selectedCurrency)}).
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

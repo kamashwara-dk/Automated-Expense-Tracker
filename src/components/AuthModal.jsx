@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { X, LogIn, UserPlus, Mail, Lock, CheckCircle2, AlertCircle, Loader2, UserCheck } from 'lucide-react';
+import {
+  X, LogIn, UserPlus, Mail, Lock,
+  CheckCircle2, AlertCircle, Loader2, UserCheck, KeyRound,
+} from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 
 export default function AuthModal({ isOpen, onClose, currentUser, onUserChange }) {
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -13,41 +16,65 @@ export default function AuthModal({ isOpen, onClose, currentUser, onUserChange }
 
   if (!isOpen) return null;
 
+  const switchMode = (next) => {
+    setMode(next);
+    setStatusMessage(null);
+    setPassword('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setStatusMessage(null);
 
+    // ── Forgot password ───────────────────────────────────────────────────────
+    if (mode === 'forgot') {
+      if (!isSupabaseConfigured) {
+        setStatusMessage({ type: 'error', text: 'Password reset requires a live Supabase connection.' });
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/?reset=true`,
+        });
+        if (error) throw error;
+        setStatusMessage({
+          type: 'success',
+          text: `Reset link sent to ${email}. Check your inbox.`,
+        });
+      } catch (err) {
+        setStatusMessage({ type: 'error', text: err.message || 'Failed to send reset email.' });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // ── Demo mode ─────────────────────────────────────────────────────────────
     if (!isSupabaseConfigured) {
       setTimeout(() => {
         const demoUser = { id: 'demo-user-1', email, name: email.split('@')[0] };
         onUserChange(demoUser);
         setStatusMessage({ type: 'success', text: `Signed in as ${email} (Demo Session)` });
         setIsLoading(false);
-        setTimeout(() => {
-          onClose();
-        }, 1000);
+        setTimeout(() => onClose(), 1000);
       }, 600);
       return;
     }
 
+    // ── Live auth ─────────────────────────────────────────────────────────────
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setStatusMessage({ type: 'success', text: 'Account created! Check your email to confirm registration.' });
-        if (data.user) {
-          onUserChange(data.user);
-          setTimeout(() => onClose(), 1200);
-        }
+        setStatusMessage({ type: 'success', text: 'Account created! Check your email to confirm.' });
+        if (data.user) { onUserChange(data.user); setTimeout(() => onClose(), 1200); }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         setStatusMessage({ type: 'success', text: 'Signed in successfully!' });
-        if (data.user) {
-          onUserChange(data.user);
-          setTimeout(() => onClose(), 1000);
-        }
+        if (data.user) { onUserChange(data.user); setTimeout(() => onClose(), 1000); }
       }
     } catch (err) {
       setStatusMessage({ type: 'error', text: err.message || 'Authentication failed' });
@@ -57,39 +84,39 @@ export default function AuthModal({ isOpen, onClose, currentUser, onUserChange }
   };
 
   const handleSignOut = async () => {
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    }
+    if (isSupabaseConfigured) await supabase.auth.signOut();
     onUserChange(null);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div
-        className="w-full max-w-md glass-modal rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-800 animate-slide-up space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-md glass-modal rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-800 animate-slide-up space-y-4"
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div>
             <h2 className="text-base font-bold text-slate-100">
-              {currentUser ? 'User Profile & Account' : mode === 'login' ? 'Sign In' : 'Create Account'}
+              {currentUser ? 'User Profile & Account'
+                : mode === 'forgot' ? 'Reset Password'
+                : mode === 'login' ? 'Sign In'
+                : 'Create Account'}
             </h2>
             <p className="text-xs text-slate-400">
-              {currentUser ? 'Manage your personal login session' : 'Sync your expense history across devices'}
+              {currentUser ? 'Manage your personal login session'
+                : mode === 'forgot' ? 'We\'ll send a reset link to your email'
+                : 'Sync your expense history across devices'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-          >
+          <button type="button" onClick={onClose}
+            className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {currentUser ? (
-          /* Signed In View */
+          /* ── Signed-in view ── */
           <div className="space-y-4 py-2">
             <div className="glass-card rounded-2xl p-4 border border-slate-800 flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-slate-900 border border-[#74FFAC]/30 flex items-center justify-center text-[#74FFAC] shrink-0">
@@ -103,102 +130,89 @@ export default function AuthModal({ isOpen, onClose, currentUser, onUserChange }
                 </span>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="w-full py-2.5 rounded-xl bg-[#FF4885]/10 hover:bg-[#FF4885]/20 text-[#FF4885] border border-[#FF4885]/20 text-xs font-bold transition-colors"
-            >
+            <button type="button" onClick={handleSignOut}
+              className="w-full py-2.5 rounded-xl bg-[#FF4885]/10 hover:bg-[#FF4885]/20 text-[#FF4885] border border-[#FF4885]/20 text-xs font-bold transition-colors">
               Sign Out
             </button>
           </div>
         ) : (
-          /* Auth Form */
+          /* ── Auth form ── */
           <>
             {statusMessage && (
-              <div
-                className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-medium ${
-                  statusMessage.type === 'success'
-                    ? 'bg-[#74FFAC]/10 text-[#74FFAC] border border-[#74FFAC]/20'
-                    : 'bg-[#FF4885]/10 text-[#FF4885] border border-[#FF4885]/20'
-                }`}
-              >
-                {statusMessage.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-[#74FFAC]" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0 text-[#FF4885]" />
-                )}
+              <div className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-medium ${
+                statusMessage.type === 'success'
+                  ? 'bg-[#74FFAC]/10 text-[#74FFAC] border border-[#74FFAC]/20'
+                  : 'bg-[#FF4885]/10 text-[#FF4885] border border-[#FF4885]/20'
+              }`}>
+                {statusMessage.type === 'success'
+                  ? <CheckCircle2 className="w-4 h-4 shrink-0 text-[#74FFAC]" />
+                  : <AlertCircle className="w-4 h-4 shrink-0 text-[#FF4885]" />}
                 <span>{statusMessage.text}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
+              {/* Email */}
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="user@example.com"
-                    value={email}
+                  <input type="email" required placeholder="user@example.com" value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-[#74FFAC] focus:ring-1 focus:ring-[#74FFAC]"
-                  />
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-[#74FFAC] focus:ring-1 focus:ring-[#74FFAC]" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-[#74FFAC] focus:ring-1 focus:ring-[#74FFAC]"
-                  />
+              {/* Password — hidden on forgot screen */}
+              {mode !== 'forgot' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-slate-300">Password</label>
+                    {mode === 'login' && (
+                      <button type="button" onClick={() => switchMode('forgot')}
+                        className="text-[11px] text-[#74FFAC] hover:underline font-semibold">
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input type="password" required minLength={6} placeholder="••••••••" value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-[#74FFAC] focus:ring-1 focus:ring-[#74FFAC]" />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 rounded-xl bg-[#74FFAC] hover:bg-[#74FFAC]/90 text-slate-950 text-xs font-extrabold shadow-md shadow-[#74FFAC]/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2"
-              >
+              {/* Submit */}
+              <button type="submit" disabled={isLoading}
+                className="w-full py-2.5 rounded-xl bg-[#74FFAC] hover:bg-[#74FFAC]/90 text-slate-950 text-xs font-extrabold shadow-md shadow-[#74FFAC]/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2">
                 {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing...</span>
-                  </>
+                  <><Loader2 className="w-4 h-4 animate-spin" /><span>Processing...</span></>
+                ) : mode === 'forgot' ? (
+                  <><KeyRound className="w-4 h-4" /><span>Send Reset Link</span></>
                 ) : mode === 'login' ? (
-                  <>
-                    <LogIn className="w-4 h-4" />
-                    <span>Sign In</span>
-                  </>
+                  <><LogIn className="w-4 h-4" /><span>Sign In</span></>
                 ) : (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    <span>Create Account</span>
-                  </>
+                  <><UserPlus className="w-4 h-4" /><span>Create Account</span></>
                 )}
               </button>
             </form>
 
-            <div className="text-center pt-2 border-t border-slate-800/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(mode === 'login' ? 'signup' : 'login');
-                  setStatusMessage(null);
-                }}
-                className="text-xs font-bold text-[#74FFAC] hover:underline"
-              >
-                {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
-              </button>
+            {/* Footer links */}
+            <div className="text-center pt-2 border-t border-slate-800/80 space-y-1.5">
+              {mode === 'forgot' ? (
+                <button type="button" onClick={() => switchMode('login')}
+                  className="text-xs font-bold text-[#74FFAC] hover:underline">
+                  ← Back to Sign In
+                </button>
+              ) : (
+                <button type="button"
+                  onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
+                  className="text-xs font-bold text-[#74FFAC] hover:underline">
+                  {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
+                </button>
+              )}
             </div>
           </>
         )}

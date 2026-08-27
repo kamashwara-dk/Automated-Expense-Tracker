@@ -14,22 +14,37 @@ import HomeView from '@/components/HomeView';
 import TransactionsView from '@/components/TransactionsView';
 import InsightsView from '@/components/InsightsView';
 import SetupView from '@/components/SetupView';
+import ConverterView from '@/components/ConverterView';
+import ExportModal from '@/components/ExportModal';
+import ProfileView from '@/components/ProfileView';
+import PasswordResetView from '@/components/PasswordResetView';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { ToastContainer, useToast } from '@/components/Toast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { useLocalStorage } from '@/lib/useLocalStorage';
+import { useTheme } from '@/lib/useTheme';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCurrency, setSelectedCurrency, currencyHydrated] = useLocalStorage('myvaluta-currency', 'USD');
   const [currentUser, setCurrentUser] = useState(null);
+
+  // ── Theme — read from localStorage and apply CSS variables immediately ──────
+  const [theme,       , themeHydrated]  = useLocalStorage('myvaluta-theme',  'dark');
+  const [accentColor, , accentHydrated] = useLocalStorage('myvaluta-accent', 'mint');
+  useTheme(themeHydrated  ? theme       : 'dark',
+           accentHydrated ? accentColor : 'mint');
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDataLoading, setIsDataLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDevSettingsOpen, setIsDevSettingsOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // Password reset intercept — detected from URL (?reset=true) + PASSWORD_RECOVERY event
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
 
   // Edit modal state
   const [editingTransaction, setEditingTransaction] = useState(null);
@@ -56,6 +71,12 @@ export default function Home() {
     // getSession() and onAuthStateChange both set currentUser and double-trigger
     // the transaction fetch, sometimes before the client session is fully attached.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        // User clicked the reset link in their email — show the new-password form
+        setIsPasswordReset(true);
+        setIsAuthLoading(false);
+        return;
+      }
       setCurrentUser(session?.user ?? null);
       setIsAuthLoading(false);
     });
@@ -253,17 +274,32 @@ export default function Home() {
   // ─── Loading Screen ───────────────────────────────────────────────────────
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-[#070b12] flex flex-col items-center justify-center gap-3">
-        <div className="drop-shadow-[0_0_24px_rgba(116,255,172,0.5)] animate-pulse">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="animate-pulse" style={{ filter: 'drop-shadow(0 0 24px rgba(var(--accent-rgb),0.5))' }}>
           <ValutaLogo size={72} />
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '120ms' }} />
-          <span className="w-2 h-2 rounded-full bg-[#74FFAC] animate-bounce" style={{ animationDelay: '240ms' }} />
+          <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent)', animationDelay: '0ms' }} />
+          <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent)', animationDelay: '120ms' }} />
+          <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent)', animationDelay: '240ms' }} />
         </div>
         <p className="text-slate-500 text-xs">Loading My Valuta...</p>
       </div>
+    );
+  }
+
+  // ─── Password Reset Gate ──────────────────────────────────────────────────
+  if (isPasswordReset) {
+    return (
+      <PasswordResetView
+        onComplete={() => {
+          setIsPasswordReset(false);
+          // Clear the ?reset=true from the URL cleanly
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
+      />
     );
   }
 
@@ -274,7 +310,7 @@ export default function Home() {
 
   // ─── Main Authenticated Dashboard ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#070b12] text-slate-100 selection:bg-[#74FFAC] selection:text-slate-950">
+    <div className="min-h-screen text-slate-100" style={{ backgroundColor: 'var(--background)', ['--tw-prose-body']: 'var(--foreground)' }}>
       <Header
         selectedCurrency={selectedCurrency}
         onCurrencyChange={setSelectedCurrency}
@@ -283,38 +319,48 @@ export default function Home() {
         onOpenDevSettings={() => setIsDevSettingsOpen(true)}
       />
 
-      {/* Desktop layout: centered narrow column with ambient background */}
+      {/* Desktop layout */}
       <div className="min-h-screen flex flex-col lg:flex-row lg:justify-center lg:items-start lg:gap-8 lg:px-8 pt-16 pb-24">
 
-        {/* Desktop left sidebar — only on lg+ */}
+        {/* Desktop left sidebar */}
         <aside className="hidden lg:flex flex-col gap-4 w-64 xl:w-72 pt-8 shrink-0 sticky top-16 h-[calc(100vh-4rem)]">
           <div className="glass-card rounded-3xl p-5 border border-slate-800 space-y-1">
             <div className="flex items-center gap-3 mb-4">
               <ValutaLogo size={40} className="shrink-0" />
               <div>
-                <p className="text-sm font-extrabold text-white">My <span className="text-[#74FFAC]">Valuta</span></p>
+                <p className="text-sm font-extrabold text-white">My <span style={{ color: 'var(--accent)' }}>Valuta</span></p>
                 <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{currentUser?.email}</p>
               </div>
             </div>
             {[
-              { id: 'home', label: 'Dashboard', icon: '⬡' },
-              { id: 'insights', label: 'Insights', icon: '◈' },
-              { id: 'transactions', label: 'History', icon: '≡' },
-              { id: 'setup', label: 'Setup Automation', icon: '⚡' },
+              { id: 'home',         label: 'Dashboard',         icon: '⬡' },
+              { id: 'insights',     label: 'Insights',           icon: '◈' },
+              { id: 'transactions', label: 'History',            icon: '≡' },
+              { id: 'converter',    label: 'Converter',          icon: '⇄' },
+              { id: 'setup',        label: 'Setup Automation',   icon: '⚡' },
+              { id: 'profile',      label: 'Profile & Settings', icon: '◎' },
             ].map((item) => (
               <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === item.id
-                    ? 'bg-[#74FFAC]/10 text-[#74FFAC] border border-[#74FFAC]/20'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
-                }`}>
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={activeTab === item.id ? {
+                  background:   'var(--accent-dim)',
+                  color:        'var(--accent)',
+                  border:       '1px solid rgba(var(--accent-rgb),0.2)',
+                } : {
+                  color: '#94a3b8',
+                  border: '1px solid transparent',
+                }}
+                onMouseEnter={(e) => { if (activeTab !== item.id) e.currentTarget.style.color = '#e2e8f0'; }}
+                onMouseLeave={(e) => { if (activeTab !== item.id) e.currentTarget.style.color = '#94a3b8'; }}
+              >
                 <span className="text-base leading-none">{item.icon}</span>
                 {item.label}
               </button>
             ))}
             <div className="pt-3 mt-2 border-t border-slate-800">
               <button type="button" onClick={() => setIsModalOpen(true)}
-                className="w-full py-2.5 rounded-xl bg-[#74FFAC] hover:bg-[#74FFAC]/90 text-slate-950 text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-[#74FFAC]/20">
+                className="w-full py-2.5 rounded-xl text-slate-950 text-sm font-extrabold flex items-center justify-center gap-2 transition-all"
+                style={{ backgroundColor: 'var(--accent)', boxShadow: '0 4px 14px -2px rgba(var(--accent-rgb),0.4)' }}>
                 <Plus className="w-4 h-4 stroke-[3]" />
                 Add Expense
               </button>
@@ -343,12 +389,22 @@ export default function Home() {
               />
             ) : activeTab === 'setup' ? (
               <SetupView currentUser={currentUser} />
+            ) : activeTab === 'converter' ? (
+              <ConverterView transactions={transactions} selectedCurrency={selectedCurrency} />
+            ) : activeTab === 'profile' ? (
+              <ProfileView
+                currentUser={currentUser}
+                selectedCurrency={selectedCurrency}
+                onCurrencyChange={setSelectedCurrency}
+                onSignOut={() => setCurrentUser(null)}
+              />
             ) : (
               <TransactionsView
                 transactions={transactions}
                 selectedCurrency={selectedCurrency}
                 isDataLoading={isDataLoading}
                 onOpenManualEntry={() => setIsModalOpen(true)}
+                onOpenExport={() => setIsExportModalOpen(true)}
                 onEditTransaction={(tx) => setEditingTransaction(tx)}
                 onDeleteTransaction={requestDeleteTransaction}
               />
@@ -409,6 +465,14 @@ export default function Home() {
         confirmLabel="Delete"
         onConfirm={confirmDeleteTransaction}
         onCancel={() => setPendingDeleteId(null)}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        transactions={transactions}
+        selectedCurrency={selectedCurrency}
       />
 
       {/* Toast Notifications */}

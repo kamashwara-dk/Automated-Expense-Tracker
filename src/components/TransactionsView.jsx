@@ -65,6 +65,7 @@ export default function TransactionsView({
   selectedCurrency = 'USD',
   isDataLoading = false,
   onOpenManualEntry,
+  onOpenExport,
   onEditTransaction,
   onDeleteTransaction,
 }) {
@@ -140,7 +141,7 @@ export default function TransactionsView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={handleExportCsv} title="Export to CSV"
+          <button type="button" onClick={() => onOpenExport?.()} title="Export transactions"
             className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-800 touch-target">
             <Download className="w-4 h-4 text-[#74FFAC]" />
             <span className="hidden sm:inline">Export</span>
