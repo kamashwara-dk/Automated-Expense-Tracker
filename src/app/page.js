@@ -27,7 +27,7 @@ import { useTheme } from '@/lib/useTheme';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
-  const [selectedCurrency, setSelectedCurrency, currencyHydrated] = useLocalStorage('myvaluta-currency', 'USD');
+  const [selectedCurrency, setSelectedCurrency, currencyHydrated] = useLocalStorage('myvaluta-currency', 'INR');
   const [currentUser, setCurrentUser] = useState(null);
 
   // ── Theme — read from localStorage and apply CSS variables immediately ──────

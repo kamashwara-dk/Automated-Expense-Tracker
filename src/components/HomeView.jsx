@@ -449,74 +449,90 @@ export default function HomeView({
         </div>
       )}
 
-      {/* 7. RECENT ACTIVITY */}
+      {/* 7. RECENT ACTIVITY — current month only */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-sm font-bold text-slate-200">Recent Activity</h3>
+          <div>
+            <h3 className="text-sm font-bold text-slate-200">Recent Activity</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">This month only</p>
+          </div>
           {transactions.length > 0 && (
             <button type="button" onClick={onNavigateToTransactions}
               className="text-xs text-[#74FFAC] hover:underline font-semibold flex items-center gap-1">
-              <span>View All ({transactions.length})</span>
+              <span>View All</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {transactions.length === 0 ? (
-          <div className="glass-card rounded-2xl p-6 text-center border border-slate-800 space-y-2">
-            <p className="text-xs text-slate-400">Transactions you add will appear here.</p>
-            <button type="button" onClick={onOpenManualEntry}
-              className="text-xs font-bold text-[#74FFAC] hover:underline flex items-center gap-1 mx-auto">
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add your first expense</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {transactions.slice(0, 5).map((tx) => {
-              const IconComp = CATEGORY_ICONS[tx.category] || ShoppingBag;
-              return (
-                <div key={tx.id}
-                  className="glass-card rounded-2xl p-3.5 flex items-center justify-between hover:border-[#74FFAC]/30 transition-all border border-slate-800/80 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[#74FFAC] shrink-0">
-                      <IconComp className="w-4 h-4" />
+        {(() => {
+          const now = new Date();
+          const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const currentMonthTxs = transactions.filter((tx) => {
+            const d = new Date(tx.date);
+            const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            return k === curKey;
+          });
+
+          if (currentMonthTxs.length === 0) {
+            return (
+              <div className="glass-card rounded-2xl p-6 text-center border border-slate-800 space-y-2">
+                <p className="text-xs text-slate-400">No expenses logged this month yet.</p>
+                <button type="button" onClick={onOpenManualEntry}
+                  className="text-xs font-bold text-[#74FFAC] hover:underline flex items-center gap-1 mx-auto">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add your first expense</span>
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-2">
+              {currentMonthTxs.slice(0, 5).map((tx) => {
+                const IconComp = CATEGORY_ICONS[tx.category] || ShoppingBag;
+                return (
+                  <div key={tx.id}
+                    className="glass-card rounded-2xl p-3.5 flex items-center justify-between hover:border-[#74FFAC]/30 transition-all border border-slate-800/80 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[#74FFAC] shrink-0">
+                        <IconComp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-100 selectable">{tx.merchant}</h4>
+                        <span className="text-[11px] text-slate-400">{tx.category}</span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-100 selectable">{tx.merchant}</h4>
-                      <span className="text-[11px] text-slate-400">{tx.category}</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-right mr-1">
+                        <span className="text-sm font-bold text-[#FF4885] num-tabular selectable" suppressHydrationWarning>
+                          -{formatCurrency(tx.amount, selectedCurrency)}
+                        </span>
+                        <p className="text-[10px] text-slate-500" suppressHydrationWarning>
+                          {formatShortDate(tx.date)}
+                        </p>
+                      </div>
+                      {onEditTransaction && (
+                        <button type="button" onClick={() => onEditTransaction(tx)}
+                          className="p-2 rounded-xl hover:bg-[#74FFAC]/10 text-slate-500 hover:text-[#74FFAC] transition-colors touch-target"
+                          aria-label={`Edit ${tx.merchant}`}>
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {onDeleteTransaction && (
+                        <button type="button" onClick={() => onDeleteTransaction(tx.id)}
+                          className="p-2 rounded-xl hover:bg-[#FF4885]/10 text-slate-500 hover:text-[#FF4885] transition-colors touch-target"
+                          aria-label={`Delete ${tx.merchant}`}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="text-right mr-1">
-                      <span className="text-sm font-bold text-[#FF4885] num-tabular selectable" suppressHydrationWarning>
-                        -{formatCurrency(tx.amount, selectedCurrency)}
-                      </span>
-                      <p className="text-[10px] text-slate-500" suppressHydrationWarning>
-                        {formatShortDate(tx.date)}
-                      </p>
-                    </div>
-                    {/* Always visible on touch — not opacity-0 hidden */}
-                    {onEditTransaction && (
-                      <button type="button" onClick={() => onEditTransaction(tx)}
-                        className="p-2 rounded-xl hover:bg-[#74FFAC]/10 text-slate-500 hover:text-[#74FFAC] transition-colors touch-target"
-                        aria-label={`Edit ${tx.merchant}`}>
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {onDeleteTransaction && (
-                      <button type="button" onClick={() => onDeleteTransaction(tx.id)}
-                        className="p-2 rounded-xl hover:bg-[#FF4885]/10 text-slate-500 hover:text-[#FF4885] transition-colors touch-target"
-                        aria-label={`Delete ${tx.merchant}`}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

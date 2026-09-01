@@ -39,7 +39,7 @@ function CurrencySelect({ value, onChange, label }) {
 
 export default function ConverterView({ transactions = [], selectedCurrency = 'USD' }) {
   // ── Converter state ────────────────────────────────────────────────────────
-  const [fromCurrency, setFromCurrency] = useState('USD');
+  const [fromCurrency, setFromCurrency] = useState('INR');
   const [toCurrency,   setToCurrency]   = useState(selectedCurrency);
   const [inputAmount,  setInputAmount]  = useState('100');
   const [rates,        setRates]        = useState(null);
