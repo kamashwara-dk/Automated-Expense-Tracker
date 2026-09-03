@@ -21,7 +21,7 @@ import PasswordResetView from '@/components/PasswordResetView';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { ToastContainer, useToast } from '@/components/Toast';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured, isRealUserId } from '@/lib/supabaseClient';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { useTheme } from '@/lib/useTheme';
 
@@ -87,7 +87,8 @@ export default function Home() {
   // ─── Load User Transactions from Supabase ─────────────────────────────────
   useEffect(() => {
     async function loadSupabaseTransactions() {
-      if (!isSupabaseConfigured || !currentUser?.id) return;
+      // Skip Supabase for guest/demo users — their IDs are not valid UUIDs
+      if (!isSupabaseConfigured || !currentUser?.id || !isRealUserId(currentUser.id)) return;
       setIsDataLoading(true);
       try {
         const { data, error } = await supabase
@@ -100,7 +101,6 @@ export default function Home() {
           console.error('Error loading transactions:', error.message, '| code:', error.code);
           toast.error('Failed to load transactions from cloud.');
         } else {
-          console.log(`Loaded ${data?.length ?? 0} transactions for user ${currentUser.id}`);
           setTransactions(data ?? []);
         }
       } catch (err) {
@@ -117,7 +117,7 @@ export default function Home() {
 
   // ─── Supabase Realtime Subscription ───────────────────────────────────────
   useEffect(() => {
-    if (!isSupabaseConfigured || !currentUser?.id) return;
+    if (!isSupabaseConfigured || !currentUser?.id || !isRealUserId(currentUser.id)) return;
 
     const channel = supabase
       .channel(`transactions-realtime-${currentUser.id}`)
@@ -169,9 +169,7 @@ export default function Home() {
         }
       )
       .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Realtime: subscribed to transactions for', currentUser.id);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error('Realtime subscription error:', status, err);
         }
       });
@@ -423,12 +421,12 @@ export default function Home() {
         />
       </div>
 
-      {/* Manual Entry — passes user_id to /api/sync */}
+      {/* Manual Entry — passes user_id to /api/sync (only for real users with valid UUIDs) */}
       <ManualEntryModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onTransactionAdded={handleTransactionAdded}
-        userId={currentUser?.id}
+        userId={isRealUserId(currentUser?.id) ? currentUser.id : null}
         selectedCurrency={selectedCurrency}
       />
 
@@ -446,7 +444,7 @@ export default function Home() {
         isOpen={isDevSettingsOpen}
         onClose={() => setIsDevSettingsOpen(false)}
         onTestWebhook={handleTransactionAdded}
-        userId={currentUser?.id}
+        userId={isRealUserId(currentUser?.id) ? currentUser.id : null}
       />
 
       {/* User Auth Profile Modal */}

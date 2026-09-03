@@ -32,12 +32,41 @@ export default function ManualEntryModal({ isOpen, onClose, onTransactionAdded, 
     setStatusMessage(null);
 
     try {
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        throw new Error('Please enter a valid amount greater than 0.');
+      }
+
+      // ── Guest / local-only mode ───────────────────────────────────────────
+      // If no userId (guest or demo user), save directly to local state
+      // without calling the API (which requires a sync_token / UUID).
+      if (!userId) {
+        const localTx = {
+          id:       'local-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+          amount:   parsedAmount,
+          merchant: merchant.trim() || 'Manual Entry',
+          category,
+          date:     new Date(date).toISOString(),
+          user_id:  null,
+        };
+        setStatusMessage({ type: 'success', text: 'Expense saved locally!' });
+        if (onTransactionAdded) onTransactionAdded(localTx);
+        setTimeout(() => {
+          setAmount('');
+          setMerchant('');
+          setStatusMessage(null);
+          onClose();
+        }, 1200);
+        return;
+      }
+
+      // ── Authenticated mode — POST to /api/sync ────────────────────────────
       const payload = {
-        amount: parseFloat(amount),
+        amount:   parsedAmount,
         merchant: merchant.trim(),
         category,
-        date: new Date(date).toISOString(),
-        ...(userId ? { user_id: userId } : {}),
+        date:     new Date(date).toISOString(),
+        user_id:  userId,
       };
 
       const res = await fetch('/api/sync', {

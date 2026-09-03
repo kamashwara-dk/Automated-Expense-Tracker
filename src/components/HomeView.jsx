@@ -7,7 +7,8 @@ import {
 import {
   TrendingUp, TrendingDown, Sparkles, Calendar, ShoppingBag, Utensils,
   Zap, CreditCard, ArrowRight, Plus, Code2, CheckCircle2, AlertTriangle,
-  Target, Edit2, Check, BellRing, Trash2, Edit3, Wallet, RefreshCw,
+  Target, Edit2, Check, X, Trash2, Edit3, Wallet, RefreshCw,
+  Sun, CalendarDays,
 } from 'lucide-react';
 import { calculateWeeklyStats } from '@/lib/mockData';
 import { formatShortDate } from '@/lib/dateUtils';
@@ -23,6 +24,7 @@ const CATEGORY_ICONS = {
   'Bills & Utilities': Zap,
 };
 
+// ── Chart tooltip ─────────────────────────────────────────────────────────────
 function CustomTooltip({ active, payload, selectedCurrency }) {
   if (active && payload && payload.length) {
     const dp = payload[0].payload;
@@ -38,6 +40,7 @@ function CustomTooltip({ active, payload, selectedCurrency }) {
   return null;
 }
 
+// ── Loading skeleton ───────────────────────────────────────────────────────────
 function SkeletonCard({ lines = 2 }) {
   return (
     <div className="glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
@@ -49,11 +52,154 @@ function SkeletonCard({ lines = 2 }) {
   );
 }
 
-/** Get local date string YYYY-MM-DD without UTC conversion */
+// ── Helpers ────────────────────────────────────────────────────────────────────
+/** YYYY-MM-DD from a Date using local time (avoids UTC-offset grouping bugs) */
 function localDateStr(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+/** Monday–Sunday bounds of the current week (local time) */
+function getWeekBounds() {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun … 6=Sat
+  const fromMon = dow === 0 ? 6 : dow - 1;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - fromMon, 0, 0, 0, 0);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+  return { weekStart: monday, weekEnd: sunday };
+}
+
+function getDailyResetLabel() {
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  const ms = midnight - now;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `Resets at midnight · in ${h}h ${m}m`;
+}
+
+function getWeeklyResetLabel() {
+  const dow = new Date().getDay();
+  const days = dow === 0 ? 1 : 8 - dow; // days until next Monday
+  if (days === 1) return 'Resets tomorrow (Mon)';
+  return `Resets Monday · in ${days} days`;
+}
+
+function getMonthlyResetLabel() {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const days = Math.ceil((next - now) / 86400000);
+  return `Resets ${next.toLocaleDateString('en-US', { month: 'short' })} 1 · in ${days} day${days !== 1 ? 's' : ''}`;
+}
+
+// ── Budget Period Card ─────────────────────────────────────────────────────────
+function BudgetPeriodCard({ label, Icon, spent, budget, onSave, resetLabel, selectedCurrency }) {
+  const [editing, setEditing] = useState(false);
+  const [tmp, setTmp]         = useState('');
+
+  const pct       = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+  const remaining = budget - spent;
+  const isOver    = spent > budget && budget > 0;
+  const isWarn    = pct >= 80 && !isOver;
+  const notSet    = budget === 0;
+
+  const barColor  = isOver ? '#FF4885' : isWarn ? '#fbbf24' : '#74FFAC';
+  const textColor = isOver ? 'text-[#FF4885]' : isWarn ? 'text-amber-400' : 'text-[#74FFAC]';
+  const iconColor = isOver ? '#FF4885'  : isWarn ? '#fbbf24'  : '#74FFAC';
+
+  const save = () => {
+    const v = parseFloat(tmp);
+    if (!isNaN(v) && v >= 0) onSave(v);
+    setEditing(false);
+  };
+
+  return (
+    <div className={`glass-card rounded-2xl p-4 border transition-all space-y-2.5 ${
+      isOver ? 'border-[#FF4885]/35 bg-[#FF4885]/5'
+             : isWarn ? 'border-amber-500/30 bg-amber-500/5'
+             : 'border-slate-800 bg-slate-900/40'
+    }`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4" style={{ color: iconColor }} />
+          <span className="text-xs font-bold text-slate-200">{label}</span>
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="number" min="0" value={tmp}
+              onChange={(e) => setTmp(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+              autoFocus
+              className="w-24 px-2 py-1 rounded-lg bg-slate-950 border border-[#74FFAC] text-xs text-white num-tabular focus:outline-none"
+            />
+            <button type="button" onClick={save}
+              className="p-1.5 rounded-lg bg-[#74FFAC] text-slate-950 touch-target">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </button>
+            <button type="button" onClick={() => setEditing(false)}
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 touch-target">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button type="button"
+            onClick={() => { setTmp(budget > 0 ? String(budget) : ''); setEditing(true); }}
+            className="flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
+            <span className="text-xs font-bold text-white num-tabular" suppressHydrationWarning>
+              {notSet ? '+ Set limit' : formatCurrency(budget, selectedCurrency)}
+            </span>
+            <Edit2 className="w-3 h-3 text-slate-500" />
+          </button>
+        )}
+      </div>
+
+      {notSet ? (
+        <p className="text-[11px] text-slate-500 pb-1">
+          Tap <strong className="text-slate-400">+ Set limit</strong> to configure your {label.toLowerCase()} budget.
+        </p>
+      ) : (
+        <>
+          {/* Big spent number */}
+          <div>
+            <div className="text-2xl font-extrabold text-white num-tabular" suppressHydrationWarning>
+              {formatCurrency(spent, selectedCurrency)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              of{' '}
+              <span className="text-slate-200 font-semibold" suppressHydrationWarning>
+                {formatCurrency(budget, selectedCurrency)}
+              </span>{' '}budget
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full h-2.5 rounded-full bg-slate-950/80 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 6px ${barColor}60` }}
+            />
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-slate-500">{pct.toFixed(0)}% used</span>
+            <span className={`font-bold ${textColor}`} suppressHydrationWarning>
+              {isOver
+                ? `⚠ Over by ${formatCurrency(-remaining, selectedCurrency)}`
+                : `${formatCurrency(remaining, selectedCurrency)} left`}
+            </span>
+          </div>
+
+          {/* Reset countdown */}
+          <p className="text-[10px] text-slate-600 leading-tight">{resetLabel}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function HomeView({
   transactions = [],
   selectedCurrency = 'USD',
@@ -64,66 +210,95 @@ export default function HomeView({
   onEditTransaction,
   onDeleteTransaction,
 }) {
-  // Persisted settings
-  const [budgetCap, setBudgetCap] = useLocalStorage('myvaluta-budget-cap', 500);
-  const [dailyAlertLimit, setDailyAlertLimit] = useLocalStorage('myvaluta-daily-limit', 50);
-
-  const [isEditingBudget, setIsEditingBudget] = useState(false);
-  const [tempBudgetInput, setTempBudgetInput] = useState('');
-  const [isEditingDailyLimit, setIsEditingDailyLimit] = useState(false);
-  const [tempDailyInput, setTempDailyInput] = useState('');
+  // ── 3-Period budget state ──────────────────────────────────────────────────
+  // Use new keys for the unified tracker
+  const [dailyBudget,   setDailyBudget]   = useLocalStorage('myvaluta-budget-daily',   0);
+  const [weeklyBudget,  setWeeklyBudget]  = useLocalStorage('myvaluta-budget-weekly',  0);
+  
+  // Try to migrate from legacy 'myvaluta-budget-cap' if monthly is not set yet
+  // We can't easily do complex migrations inside useLocalStorage directly in this simple component,
+  // but we can just provide a default. Let's just stick to the new keys and default to 0.
+  const [monthlyBudget, setMonthlyBudget] = useLocalStorage('myvaluta-budget-monthly', 0);
 
   const stats = calculateWeeklyStats(transactions);
-
-  // Use local date to avoid UTC grouping mismatch
   const todayStr = localDateStr();
 
-  const todayTotal = useMemo(() => {
-    return transactions.reduce((sum, tx) => {
-      const txStr = localDateStr(new Date(tx.date));
-      return txStr === todayStr ? sum + Number(tx.amount || 0) : sum;
-    }, 0);
-  }, [transactions, todayStr]);
+  // ── Date bounds (computed once per mount) ──────────────────────────────────
+  const { weekStart, weekEnd } = useMemo(() => getWeekBounds(), []);
+  const { monthStart, monthEnd } = useMemo(() => {
+    const n = new Date();
+    return {
+      monthStart: new Date(n.getFullYear(), n.getMonth(), 1, 0, 0, 0, 0),
+      monthEnd:   new Date(n.getFullYear(), n.getMonth() + 1, 0, 23, 59, 59, 999),
+    };
+  }, []);
 
-  // Monthly total (current calendar month)
-  const monthlyTotal = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    return transactions.reduce((sum, tx) => {
+  // ── Per-period spent amounts ───────────────────────────────────────────────
+  const dailySpent = useMemo(() =>
+    transactions.reduce((s, tx) =>
+      localDateStr(new Date(tx.date)) === todayStr ? s + Number(tx.amount || 0) : s
+    , 0),
+  [transactions, todayStr]);
+
+  const weeklySpent = useMemo(() =>
+    transactions.reduce((s, tx) => {
       const d = new Date(tx.date);
-      return d.getFullYear() === year && d.getMonth() === month
-        ? sum + Number(tx.amount || 0)
-        : sum;
-    }, 0);
+      return d >= weekStart && d <= weekEnd ? s + Number(tx.amount || 0) : s;
+    }, 0),
+  [transactions, weekStart, weekEnd]);
+
+  const monthlySpent = useMemo(() =>
+    transactions.reduce((s, tx) => {
+      const d = new Date(tx.date);
+      return d >= monthStart && d <= monthEnd ? s + Number(tx.amount || 0) : s;
+    }, 0),
+  [transactions, monthStart, monthEnd]);
+
+  // ── Intelligence data ──────────────────────────────────────────────────────
+  // All-time daily average
+  const allTimeDailyAvg = useMemo(() => {
+    if (!transactions.length) return 0;
+    const days = new Set(transactions.map(tx => localDateStr(new Date(tx.date))));
+    const total = transactions.reduce((s, tx) => s + Number(tx.amount || 0), 0);
+    return days.size > 0 ? total / days.size : 0;
   }, [transactions]);
 
-  const isDailyLimitExceeded = todayTotal > dailyAlertLimit;
-  // Use monthly total for Monthly Budget Cap (fixes logic mismatch)
-  const budgetSpentPct = budgetCap > 0 ? (monthlyTotal / budgetCap) * 100 : 0;
-  const budgetRemaining = budgetCap - monthlyTotal;
+  const todayVsAvg = allTimeDailyAvg > 0 ? dailySpent / allTimeDailyAvg : 0;
 
-  let insightState = 'optimal';
-  if (isDailyLimitExceeded || stats.pctChange > 15 || budgetSpentPct > 90) {
-    insightState = 'critical';
-  } else if (stats.current7Total > 220 || budgetSpentPct > 70) {
-    insightState = 'warning';
-  }
+  // Monthly forecast (project daily rate to end of month)
+  const monthForecast = useMemo(() => {
+    const n = new Date();
+    const dayOfMonth = n.getDate();
+    const daysInMonth = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate();
+    if (dayOfMonth < 3 || monthlySpent === 0) return null;
+    const dailyRate = monthlySpent / dayOfMonth;
+    return { projected: dailyRate * daysInMonth, dailyRate, daysLeft: daysInMonth - dayOfMonth };
+  }, [monthlySpent]);
 
-  const handleSaveBudget = () => {
-    const val = parseFloat(tempBudgetInput);
-    if (!isNaN(val) && val > 0) setBudgetCap(val);
-    setIsEditingBudget(false);
-  };
+  // Top spending category (all-time)
+  const topCategory = useMemo(() => {
+    const totals = {};
+    transactions.forEach(tx => {
+      const cat = tx.category || 'Other';
+      totals[cat] = (totals[cat] || 0) + Number(tx.amount || 0);
+    });
+    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (!sorted.length) return null;
+    const total = transactions.reduce((s, tx) => s + Number(tx.amount || 0), 0);
+    return { name: sorted[0][0], amount: sorted[0][1], pct: total > 0 ? (sorted[0][1] / total) * 100 : 0 };
+  }, [transactions]);
 
-  const handleSaveDailyLimit = () => {
-    const val = parseFloat(tempDailyInput);
-    if (!isNaN(val) && val > 0) setDailyAlertLimit(val);
-    setIsEditingDailyLimit(false);
-  };
+  // Top merchant by visit count (not amount)
+  const topMerchantByCount = useMemo(() => {
+    const counts = {};
+    transactions.forEach(tx => { counts[tx.merchant] = (counts[tx.merchant] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted.length ? { name: sorted[0][0], count: sorted[0][1] } : null;
+  }, [transactions]);
 
   const isEmpty = transactions.length === 0;
 
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (isDataLoading) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -139,7 +314,7 @@ export default function HomeView({
     <div className="space-y-5 animate-fade-in">
       <InstallPwaBanner />
 
-      {/* 1. HERO BALANCE CARD */}
+      {/* ── 1. HERO BALANCE CARD ─────────────────────────────────────────── */}
       <div className="glass-card rounded-3xl p-6 relative overflow-hidden bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-emerald-950/30 border border-slate-800 shadow-xl space-y-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
@@ -151,31 +326,21 @@ export default function HomeView({
             <span suppressHydrationWarning>{Math.abs(stats.pctChange).toFixed(1)}% vs last week</span>
           </div>
         </div>
+
         <div>
           <div className="text-4xl font-extrabold text-white tracking-tight num-tabular selectable" suppressHydrationWarning>
             {formatCurrency(stats.current7Total, selectedCurrency)}
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-400 mt-2">
-            <span>Daily Avg: <strong className="text-slate-200 num-tabular selectable" suppressHydrationWarning>{formatCurrency(stats.dailyAvg, selectedCurrency)}</strong></span>
-            <span>•</span>
-            <span>This Month: <strong className="text-slate-200 num-tabular selectable" suppressHydrationWarning>{formatCurrency(monthlyTotal, selectedCurrency)}</strong></span>
+            <span>Daily Avg: <strong className="text-slate-200 num-tabular" suppressHydrationWarning>{formatCurrency(stats.dailyAvg, selectedCurrency)}</strong></span>
+            <span>·</span>
+            <span>This Month: <strong className="text-slate-200 num-tabular" suppressHydrationWarning>{formatCurrency(monthlySpent, selectedCurrency)}</strong></span>
           </div>
         </div>
-        <div className="pt-3 border-t border-slate-800/80 flex items-center gap-2">
-          <button type="button" onClick={onOpenManualEntry}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[#74FFAC] hover:bg-[#74FFAC]/90 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#74FFAC]/20 touch-target">
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Record Expense</span>
-          </button>
-          <button type="button" onClick={onOpenDevSettings}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700/60 touch-target">
-            <Code2 className="w-4 h-4 text-[#74FFAC]" />
-            <span>API</span>
-          </button>
-        </div>
+
       </div>
 
-      {/* ONBOARDING EMPTY STATE */}
+      {/* ── ONBOARDING EMPTY STATE ─────────────────────────────────────────── */}
       {isEmpty && (
         <div className="glass-card rounded-2xl p-6 border border-[#74FFAC]/20 bg-[#74FFAC]/5 space-y-3 text-center animate-slide-down">
           <div className="w-12 h-12 rounded-2xl bg-[#74FFAC]/10 border border-[#74FFAC]/20 flex items-center justify-center mx-auto">
@@ -184,111 +349,54 @@ export default function HomeView({
           <div>
             <h3 className="text-sm font-bold text-slate-100">No expenses yet</h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Add your first expense manually, or set up the webhook to auto-sync from your phone.
+              Add your first expense to get started.
             </p>
-          </div>
-          <div className="flex items-center gap-2 justify-center pt-1">
-            <button type="button" onClick={onOpenManualEntry}
-              className="px-4 py-2 rounded-xl bg-[#74FFAC] text-slate-950 text-xs font-extrabold shadow-sm flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Add Expense</span>
-            </button>
-            <button type="button" onClick={onOpenDevSettings}
-              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700 flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5 text-[#74FFAC]" />
-              <span>Setup Webhook</span>
-            </button>
           </div>
         </div>
       )}
 
-      {/* 2. DAILY TRANSACTION ALERT LIMIT */}
-      <div className={`glass-card rounded-2xl p-4 border transition-all ${isDailyLimitExceeded ? 'border-[#FF4885]/40 bg-[#FF4885]/10 shadow-lg shadow-[#FF4885]/10' : 'border-slate-800 bg-slate-900/60'} space-y-3`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-            <BellRing className={`w-4 h-4 ${isDailyLimitExceeded ? 'text-[#FF4885] animate-bounce' : 'text-[#74FFAC]'}`} />
-            <span>Daily Alert Limit</span>
+      {/* ── 2. BUDGET TRACKER ─────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <h3 className="text-sm font-bold text-slate-200">Budget Tracker</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Daily · Weekly · Monthly with auto-reset</p>
           </div>
-          <div className="flex items-center gap-2">
-            {isEditingDailyLimit ? (
-              <div className="flex items-center gap-1">
-                <input type="number" value={tempDailyInput} onChange={(e) => setTempDailyInput(e.target.value)}
-                  className="w-20 px-2 py-1 rounded-lg bg-slate-950 border border-[#74FFAC] text-xs text-white num-tabular focus:outline-none"
-                  autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveDailyLimit()} />
-                <button type="button" onClick={handleSaveDailyLimit}
-                  className="p-1.5 rounded-lg bg-[#74FFAC] text-slate-950 font-bold touch-target">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => { setTempDailyInput(String(dailyAlertLimit)); setIsEditingDailyLimit(true); }}
-                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                <span className="font-bold text-white num-tabular selectable" suppressHydrationWarning>{formatCurrency(dailyAlertLimit, selectedCurrency)}/day</span>
-                <Edit2 className="w-3 h-3 text-slate-500" />
-              </button>
-            )}
-          </div>
+          <Target className="w-4 h-4 text-[#74FFAC]" />
         </div>
-        <div className="space-y-1.5">
-          <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-700 ${isDailyLimitExceeded ? 'bg-[#FF4885]' : 'bg-[#74FFAC]'}`}
-              style={{ width: `${Math.min((todayTotal / dailyAlertLimit) * 100, 100)}%` }} />
-          </div>
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-400">Today: <strong className="text-white num-tabular selectable" suppressHydrationWarning>{formatCurrency(todayTotal, selectedCurrency)}</strong></span>
-            <span className={isDailyLimitExceeded ? 'text-[#FF4885] font-bold' : 'text-[#74FFAC]'}>
-              {isDailyLimitExceeded
-                ? `⚠️ Over by ${formatCurrency(todayTotal - dailyAlertLimit, selectedCurrency)}`
-                : `${formatCurrency(dailyAlertLimit - todayTotal, selectedCurrency)} left today`}
-            </span>
-          </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <BudgetPeriodCard
+            label="Today"
+            Icon={Sun}
+            spent={dailySpent}
+            budget={dailyBudget}
+            onSave={setDailyBudget}
+            resetLabel={getDailyResetLabel()}
+            selectedCurrency={selectedCurrency}
+          />
+          <BudgetPeriodCard
+            label="This Week"
+            Icon={Calendar}
+            spent={weeklySpent}
+            budget={weeklyBudget}
+            onSave={setWeeklyBudget}
+            resetLabel={getWeeklyResetLabel()}
+            selectedCurrency={selectedCurrency}
+          />
+          <BudgetPeriodCard
+            label="This Month"
+            Icon={CalendarDays}
+            spent={monthlySpent}
+            budget={monthlyBudget}
+            onSave={setMonthlyBudget}
+            resetLabel={getMonthlyResetLabel()}
+            selectedCurrency={selectedCurrency}
+          />
         </div>
       </div>
 
-      {/* 3. MONTHLY BUDGET CAP — now uses actual monthly total */}
-      <div className="glass-card rounded-2xl p-4 border border-slate-800 bg-slate-900/60 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-            <Target className="w-4 h-4 text-[#74FFAC]" />
-            <span>Monthly Budget Cap</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isEditingBudget ? (
-              <div className="flex items-center gap-1">
-                <input type="number" value={tempBudgetInput} onChange={(e) => setTempBudgetInput(e.target.value)}
-                  className="w-20 px-2 py-1 rounded-lg bg-slate-950 border border-[#74FFAC] text-xs text-white num-tabular focus:outline-none"
-                  autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveBudget()} />
-                <button type="button" onClick={handleSaveBudget}
-                  className="p-1.5 rounded-lg bg-[#74FFAC] text-slate-950 font-bold touch-target">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => { setTempBudgetInput(String(budgetCap)); setIsEditingBudget(true); }}
-                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-                <span className="font-bold text-white num-tabular selectable" suppressHydrationWarning>{formatCurrency(budgetCap, selectedCurrency)}</span>
-                <Edit2 className="w-3 h-3 text-slate-500" />
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-700 ${budgetSpentPct > 90 ? 'bg-[#FF4885]' : budgetSpentPct > 70 ? 'bg-amber-400' : 'bg-[#74FFAC]'}`}
-              style={{ width: `${Math.min(budgetSpentPct, 100)}%` }} />
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span suppressHydrationWarning>{budgetSpentPct.toFixed(1)}% used this month</span>
-            <span suppressHydrationWarning>
-              {budgetRemaining >= 0
-                ? `${formatCurrency(budgetRemaining, selectedCurrency)} remaining`
-                : `${formatCurrency(Math.abs(budgetRemaining), selectedCurrency)} over budget`}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. FINANCIAL INTELLIGENCE CARD */}
+      {/* ── 3. FINANCIAL INTELLIGENCE ─────────────────────────────────────── */}
       <div className="glass-card rounded-2xl p-4 border border-slate-800 bg-slate-900/60 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
@@ -304,120 +412,152 @@ export default function HomeView({
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Start tracking to unlock spending insights and personalized financial intelligence.
+              Start tracking expenses to unlock personalised spending insights and financial intelligence.
             </p>
           </div>
         ) : (
           <div className="space-y-2 pt-1">
-            {/* Insight 1 — Daily limit */}
-            {isDailyLimitExceeded ? (
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
-                <AlertTriangle className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                  <strong className="text-[#FF4885]">Daily limit hit!</strong> You&apos;ve spent{' '}
-                  {formatCurrency(todayTotal, selectedCurrency)} today —{' '}
-                  {formatCurrency(todayTotal - dailyAlertLimit, selectedCurrency)} over your{' '}
-                  {formatCurrency(dailyAlertLimit, selectedCurrency)} limit.
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#74FFAC]/8 border border-[#74FFAC]/15">
-                <CheckCircle2 className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                  Today&apos;s spend is <strong className="text-[#74FFAC]">{formatCurrency(todayTotal, selectedCurrency)}</strong> —{' '}
-                  {formatCurrency(dailyAlertLimit - todayTotal, selectedCurrency)} under your daily limit.
-                </p>
-              </div>
-            )}
 
-            {/* Insight 2 — Monthly budget */}
-            {budgetSpentPct > 90 ? (
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
-                <AlertTriangle className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                  <strong className="text-[#FF4885]">Budget almost exhausted</strong> — {budgetSpentPct.toFixed(0)}% used.
-                  Only {formatCurrency(Math.max(budgetRemaining, 0), selectedCurrency)} left this month.
-                </p>
-              </div>
-            ) : budgetSpentPct > 70 ? (
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                  Monthly budget is <strong className="text-amber-400">{budgetSpentPct.toFixed(0)}% used</strong>.{' '}
-                  {formatCurrency(budgetRemaining, selectedCurrency)} remaining — consider slowing discretionary spend.
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                <Target className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                  Monthly budget on track — <strong className="text-[#74FFAC]">{budgetSpentPct.toFixed(0)}% used</strong>,{' '}
-                  {formatCurrency(budgetRemaining, selectedCurrency)} remaining.
-                </p>
-              </div>
-            )}
-
-            {/* Insight 3 — Week-over-week trend */}
-            {stats.previous7Total > 0 && (
-              stats.pctChange > 15 ? (
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FF4885]/8 border border-[#FF4885]/20">
-                  <TrendingUp className="w-4 h-4 text-[#FF4885] shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                    Spending is <strong className="text-[#FF4885]">up {stats.pctChange.toFixed(1)}%</strong> vs last week
-                    ({formatCurrency(stats.current7Total, selectedCurrency)} vs{' '}
-                    {formatCurrency(stats.previous7Total, selectedCurrency)}).
-                  </p>
-                </div>
-              ) : stats.pctChange < -10 ? (
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-[#74FFAC]/8 border border-[#74FFAC]/15">
-                  <TrendingDown className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                    Great progress — spending is <strong className="text-[#74FFAC]">down {Math.abs(stats.pctChange).toFixed(1)}%</strong> vs last week.
-                  </p>
-                </div>
+            {/* Daily budget status */}
+            {dailyBudget > 0 && (
+              dailySpent > dailyBudget ? (
+                <InsightRow icon={AlertTriangle} color="red">
+                  <strong className="text-[#FF4885]">Daily budget exceeded!</strong> You spent{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(dailySpent, selectedCurrency)}</span> —{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(dailySpent - dailyBudget, selectedCurrency)}</span> over your limit.
+                </InsightRow>
               ) : (
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                  <TrendingDown className="w-4 h-4 text-[#74FFAC] shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                    Week-on-week spend is <strong className="text-[#74FFAC]">stable</strong> —{' '}
-                    {formatCurrency(stats.current7Total, selectedCurrency)} this week vs{' '}
-                    {formatCurrency(stats.previous7Total, selectedCurrency)} last week.
-                  </p>
-                </div>
+                <InsightRow icon={CheckCircle2} color="green">
+                  Today&apos;s spend is{' '}
+                  <strong className="text-[#74FFAC] num-tabular" suppressHydrationWarning>{formatCurrency(dailySpent, selectedCurrency)}</strong> —{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(dailyBudget - dailySpent, selectedCurrency)}</span> under your daily limit. ✓
+                </InsightRow>
               )
             )}
 
-            {/* Insight 4 — Top category callout */}
-            {(() => {
-              const catTotals = {};
-              transactions.forEach((tx) => {
-                const cat = tx.category || 'Other';
-                catTotals[cat] = (catTotals[cat] || 0) + Number(tx.amount || 0);
-              });
-              const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
-              if (!topCat) return null;
-              const [name, amount] = topCat;
-              const pct = monthlyTotal > 0 ? (amount / monthlyTotal) * 100 : 0;
-              if (pct < 30) return null; // Only show if one category dominates
+            {/* Weekly budget status */}
+            {weeklyBudget > 0 && (() => {
+              const pct = (weeklySpent / weeklyBudget) * 100;
+              const left = weeklyBudget - weeklySpent;
+              if (weeklySpent > weeklyBudget) return (
+                <InsightRow icon={AlertTriangle} color="red">
+                  <strong className="text-[#FF4885]">Weekly limit exceeded</strong> by{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(-left, selectedCurrency)}</span>.
+                  Consider pausing non-essential spending until Monday.
+                </InsightRow>
+              );
+              if (pct > 80) return (
+                <InsightRow icon={AlertTriangle} color="amber">
+                  Weekly budget is <strong className="text-amber-400">{pct.toFixed(0)}% used</strong>.{' '}
+                  Only <span className="num-tabular" suppressHydrationWarning>{formatCurrency(left, selectedCurrency)}</span> remaining this week.
+                </InsightRow>
+              );
               return (
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                  <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300 leading-relaxed" suppressHydrationWarning>
-                    <strong className="text-slate-100">{name}</strong> accounts for{' '}
-                    <strong className="text-amber-400">{pct.toFixed(0)}%</strong> of your total spend
-                    ({formatCurrency(amount, selectedCurrency)}).
-                  </p>
-                </div>
+                <InsightRow icon={CheckCircle2} color="green">
+                  Weekly budget on track — <strong className="text-[#74FFAC]">{pct.toFixed(0)}% used</strong>,{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(left, selectedCurrency)}</span> left.
+                </InsightRow>
               );
             })()}
+
+            {/* Monthly budget status */}
+            {monthlyBudget > 0 && (() => {
+              const pct = (monthlySpent / monthlyBudget) * 100;
+              const left = monthlyBudget - monthlySpent;
+              if (monthlySpent > monthlyBudget) return (
+                <InsightRow icon={AlertTriangle} color="red">
+                  <strong className="text-[#FF4885]">Monthly budget exceeded!</strong>{' '}
+                  Over by <span className="num-tabular" suppressHydrationWarning>{formatCurrency(-left, selectedCurrency)}</span>.
+                </InsightRow>
+              );
+              if (pct > 90) return (
+                <InsightRow icon={AlertTriangle} color="red">
+                  <strong className="text-[#FF4885]">Monthly budget almost exhausted</strong> — {pct.toFixed(0)}% used.
+                  Only <span className="num-tabular" suppressHydrationWarning>{formatCurrency(left, selectedCurrency)}</span> left.
+                </InsightRow>
+              );
+              if (pct > 70) return (
+                <InsightRow icon={AlertTriangle} color="amber">
+                  Monthly budget is <strong className="text-amber-400">{pct.toFixed(0)}% used</strong>.{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(left, selectedCurrency)}</span> remaining — watch discretionary spend.
+                </InsightRow>
+              );
+              return (
+                <InsightRow icon={Target} color="green">
+                  Monthly budget on track — <strong className="text-[#74FFAC]">{pct.toFixed(0)}% used</strong>,{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(left, selectedCurrency)}</span> remaining.
+                </InsightRow>
+              );
+            })()}
+
+            {/* Week-over-week trend */}
+            {stats.previous7Total > 0 && (
+              stats.pctChange > 15 ? (
+                <InsightRow icon={TrendingUp} color="red">
+                  Spending is <strong className="text-[#FF4885]">up {stats.pctChange.toFixed(1)}%</strong> vs last 7 days
+                  (<span className="num-tabular" suppressHydrationWarning>{formatCurrency(stats.current7Total, selectedCurrency)}</span> vs{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(stats.previous7Total, selectedCurrency)}</span>).
+                </InsightRow>
+              ) : stats.pctChange < -10 ? (
+                <InsightRow icon={TrendingDown} color="green">
+                  Great work — spending is <strong className="text-[#74FFAC]">down {Math.abs(stats.pctChange).toFixed(1)}%</strong> vs last 7 days.
+                </InsightRow>
+              ) : (
+                <InsightRow icon={TrendingDown} color="neutral">
+                  Week-on-week spend is <strong className="text-[#74FFAC]">stable</strong> —{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(stats.current7Total, selectedCurrency)}</span> vs{' '}
+                  <span className="num-tabular" suppressHydrationWarning>{formatCurrency(stats.previous7Total, selectedCurrency)}</span> last week.
+                </InsightRow>
+              )
+            )}
+
+            {/* Month-end spending forecast */}
+            {monthForecast && (
+              <InsightRow icon={Zap} color="amber">
+                <strong className="text-slate-100">Forecast:</strong> At your current rate of{' '}
+                <span className="num-tabular" suppressHydrationWarning>{formatCurrency(monthForecast.dailyRate, selectedCurrency)}</span>/day,
+                you&apos;ll spend ~<strong className="text-amber-400 num-tabular" suppressHydrationWarning>{formatCurrency(monthForecast.projected, selectedCurrency)}</strong> this month
+                {monthlyBudget > 0 && monthForecast.projected > monthlyBudget
+                  ? <> — <span className="text-[#FF4885] num-tabular" suppressHydrationWarning>{formatCurrency(monthForecast.projected - monthlyBudget, selectedCurrency)}</span> over budget.</>
+                  : '.'}
+              </InsightRow>
+            )}
+
+            {/* Anomaly: today vs daily average */}
+            {allTimeDailyAvg > 0 && dailySpent > 0 && todayVsAvg > 1.5 && (
+              <InsightRow icon={AlertTriangle} color="amber">
+                Today&apos;s spend (<span className="num-tabular" suppressHydrationWarning>{formatCurrency(dailySpent, selectedCurrency)}</span>) is{' '}
+                <strong className="text-amber-400">{todayVsAvg.toFixed(1)}× your daily average</strong>{' '}
+                (<span className="num-tabular" suppressHydrationWarning>{formatCurrency(allTimeDailyAvg, selectedCurrency)}</span>). High-spend day.
+              </InsightRow>
+            )}
+
+            {/* Top category dominance */}
+            {topCategory && topCategory.pct >= 35 && (
+              <InsightRow icon={Zap} color="amber">
+                <strong className="text-slate-100">{topCategory.name}</strong> accounts for{' '}
+                <strong className="text-amber-400">{topCategory.pct.toFixed(0)}%</strong> of all-time spend
+                (<span className="num-tabular" suppressHydrationWarning>{formatCurrency(topCategory.amount, selectedCurrency)}</span>).
+                Consider a category-specific budget.
+              </InsightRow>
+            )}
+
+            {/* Frequent merchant */}
+            {topMerchantByCount && topMerchantByCount.count >= 4 && (
+              <InsightRow icon={CheckCircle2} color="neutral">
+                You&apos;ve visited <strong className="text-slate-100">{topMerchantByCount.name}</strong>{' '}
+                <strong className="text-[#74FFAC]">{topMerchantByCount.count} times</strong>.
+                Frequent visits — is it intentional?
+              </InsightRow>
+            )}
           </div>
         )}
       </div>
 
-      {/* 5. CATEGORY BREAKDOWN */}
+      {/* ── 4. CATEGORY BREAKDOWN ─────────────────────────────────────────── */}
       {!isEmpty && <CategoryBreakdownCard transactions={transactions} selectedCurrency={selectedCurrency} />}
 
-      {/* 6. VELOCITY CHART */}
+      {/* ── 5. VELOCITY CHART ─────────────────────────────────────────────── */}
       {!isEmpty && (
         <div className="glass-card rounded-3xl p-5 border border-slate-800 shadow-lg space-y-3">
           <div className="flex items-center justify-between">
@@ -434,8 +574,8 @@ export default function HomeView({
               <AreaChart data={stats.chartData} margin={{ top: 8, right: 8, left: -28, bottom: 0 }}>
                 <defs>
                   <linearGradient id="mintGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#74FFAC" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#74FFAC" stopOpacity={0.0} />
+                    <stop offset="5%"  stopColor="#74FFAC" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#74FFAC" stopOpacity={0.0}  />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -449,7 +589,7 @@ export default function HomeView({
         </div>
       )}
 
-      {/* 7. RECENT ACTIVITY — current month only */}
+      {/* ── 6. RECENT ACTIVITY ────────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <div>
@@ -468,28 +608,20 @@ export default function HomeView({
         {(() => {
           const now = new Date();
           const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-          const currentMonthTxs = transactions.filter((tx) => {
+          const monthly = transactions.filter((tx) => {
             const d = new Date(tx.date);
-            const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            return k === curKey;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === curKey;
           });
 
-          if (currentMonthTxs.length === 0) {
-            return (
-              <div className="glass-card rounded-2xl p-6 text-center border border-slate-800 space-y-2">
-                <p className="text-xs text-slate-400">No expenses logged this month yet.</p>
-                <button type="button" onClick={onOpenManualEntry}
-                  className="text-xs font-bold text-[#74FFAC] hover:underline flex items-center gap-1 mx-auto">
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add your first expense</span>
-                </button>
-              </div>
-            );
-          }
+          if (monthly.length === 0) return (
+            <div className="glass-card rounded-2xl p-6 text-center border border-slate-800 space-y-2">
+              <p className="text-xs text-slate-400">No expenses this month yet.</p>
+            </div>
+          );
 
           return (
             <div className="space-y-2">
-              {currentMonthTxs.slice(0, 5).map((tx) => {
+              {monthly.slice(0, 5).map((tx) => {
                 const IconComp = CATEGORY_ICONS[tx.category] || ShoppingBag;
                 return (
                   <div key={tx.id}
@@ -534,6 +666,24 @@ export default function HomeView({
           );
         })()}
       </div>
+    </div>
+  );
+}
+
+// ── Insight Row ─────────────────────────────────────────────────────────────
+const INSIGHT_STYLES = {
+  red:     { wrap: 'bg-[#FF4885]/8 border-[#FF4885]/20', icon: 'text-[#FF4885]' },
+  amber:   { wrap: 'bg-amber-500/8 border-amber-500/20', icon: 'text-amber-400' },
+  green:   { wrap: 'bg-[#74FFAC]/8 border-[#74FFAC]/15', icon: 'text-[#74FFAC]' },
+  neutral: { wrap: 'bg-slate-800/50 border-slate-700/50', icon: 'text-[#74FFAC]' },
+};
+
+function InsightRow({ icon: Icon, color = 'neutral', children }) {
+  const s = INSIGHT_STYLES[color] || INSIGHT_STYLES.neutral;
+  return (
+    <div className={`flex items-start gap-3 p-2.5 rounded-xl border ${s.wrap}`}>
+      <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${s.icon}`} />
+      <p className="text-xs text-slate-300 leading-relaxed">{children}</p>
     </div>
   );
 }

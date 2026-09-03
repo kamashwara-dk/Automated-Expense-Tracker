@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, Loader2, ChevronRight,
   Moon, Sparkles, ShieldCheck, Trash2,
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured, isRealUserId } from '@/lib/supabaseClient';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { applyTheme } from '@/lib/useTheme';
@@ -107,7 +107,7 @@ export default function ProfileView({ currentUser, selectedCurrency, onCurrencyC
     }
   };
 
-  const isGuest = currentUser?.id === 'guest-user';
+  const isGuest = !isRealUserId(currentUser?.id);
 
   return (
     <div className="space-y-5 animate-fade-in pb-4">

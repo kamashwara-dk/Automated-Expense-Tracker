@@ -59,7 +59,6 @@ async function resolveUserIdFromToken(token) {
 export async function POST(req) {
   try {
     const bodyText = await req.text();
-    console.log('Raw Incoming Body:', bodyText.substring(0, 200));
 
     let body;
     try {
@@ -105,8 +104,6 @@ export async function POST(req) {
       );
     }
 
-    console.log('Authenticated user:', resolvedUserId);
-
     // ── 2. Parse the incoming payload ───────────────────────────────────────
     let parsedAmount   = 0;
     let parsedMerchant = 'Unknown Merchant';
@@ -142,8 +139,6 @@ export async function POST(req) {
       date:     body.date || new Date().toISOString(),
     };
 
-    console.log('Inserting transaction:', JSON.stringify(transactionData));
-
     if (isSupabaseConfigured) {
       const { error: insertError } = await supabaseAdmin
         .from('transactions')
@@ -152,11 +147,7 @@ export async function POST(req) {
       if (insertError) {
         console.error('Supabase insert error:', insertError.message);
         // Return 200 anyway so the caller's Shortcut/MacroDroid action doesn't retry
-      } else {
-        console.log('Transaction inserted successfully');
       }
-    } else {
-      console.log('Supabase not configured — skipping insert');
     }
 
     return NextResponse.json(

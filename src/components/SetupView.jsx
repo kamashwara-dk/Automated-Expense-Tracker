@@ -5,7 +5,7 @@ import {
   Zap, Copy, Check, RefreshCw, Smartphone, Link2,
   ChevronRight, AlertCircle, Loader2, ShieldCheck, TabletSmartphone,
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured, isRealUserId } from '@/lib/supabaseClient';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export default function SetupView({ currentUser }) {
 
   // ── Fetch or create sync token ────────────────────────────────────────────
   const loadToken = useCallback(async () => {
-    if (!isSupabaseConfigured || !currentUser?.id) {
+    if (!isSupabaseConfigured || !currentUser?.id || !isRealUserId(currentUser.id)) {
       setSyncToken('val_demo_notpersisted');
       setIsLoading(false);
       return;
@@ -100,7 +100,7 @@ export default function SetupView({ currentUser }) {
 
   // ── Regenerate token ──────────────────────────────────────────────────────
   const handleRegenerate = async () => {
-    if (!isSupabaseConfigured || !currentUser?.id) return;
+    if (!isSupabaseConfigured || !currentUser?.id || !isRealUserId(currentUser.id)) return;
     setIsRegenerating(true);
     setError(null);
     try {
