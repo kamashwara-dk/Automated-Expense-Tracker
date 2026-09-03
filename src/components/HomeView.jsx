@@ -92,7 +92,7 @@ function getMonthlyResetLabel() {
 }
 
 // ── Budget Period Card ─────────────────────────────────────────────────────────
-function BudgetPeriodCard({ label, Icon, spent, budget, onSave, resetLabel, selectedCurrency }) {
+function BudgetPeriodCard({ label, Icon, spent, budget, onSave, resetLabel, selectedCurrency, isDerived = false }) {
   const [editing, setEditing] = useState(false);
   const [tmp, setTmp]         = useState('');
 
@@ -107,6 +107,7 @@ function BudgetPeriodCard({ label, Icon, spent, budget, onSave, resetLabel, sele
   const iconColor = isOver ? '#FF4885'  : isWarn ? '#fbbf24'  : '#74FFAC';
 
   const save = () => {
+    if (isDerived) return;
     const v = parseFloat(tmp);
     if (!isNaN(v) && v >= 0) onSave(v);
     setEditing(false);
@@ -143,20 +144,32 @@ function BudgetPeriodCard({ label, Icon, spent, budget, onSave, resetLabel, sele
             </button>
           </div>
         ) : (
-          <button type="button"
-            onClick={() => { setTmp(budget > 0 ? String(budget) : ''); setEditing(true); }}
-            className="flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
-            <span className="text-xs font-bold text-white num-tabular" suppressHydrationWarning>
-              {notSet ? '+ Set limit' : formatCurrency(budget, selectedCurrency)}
-            </span>
-            <Edit2 className="w-3 h-3 text-slate-500" />
-          </button>
+          isDerived && !notSet ? (
+            <div className="flex items-center gap-1 text-slate-400">
+              <span className="text-xs font-bold text-white num-tabular" suppressHydrationWarning>
+                {formatCurrency(budget, selectedCurrency)}
+              </span>
+            </div>
+          ) : !isDerived ? (
+            <button type="button"
+              onClick={() => { setTmp(budget > 0 ? String(budget) : ''); setEditing(true); }}
+              className="flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
+              <span className="text-xs font-bold text-white num-tabular" suppressHydrationWarning>
+                {notSet ? '+ Set limit' : formatCurrency(budget, selectedCurrency)}
+              </span>
+              <Edit2 className="w-3 h-3 text-slate-500" />
+            </button>
+          ) : null
         )}
       </div>
 
       {notSet ? (
         <p className="text-[11px] text-slate-500 pb-1">
-          Tap <strong className="text-slate-400">+ Set limit</strong> to configure your {label.toLowerCase()} budget.
+          {isDerived ? (
+            <>Set your <strong className="text-slate-400">Monthly</strong> limit to auto-calculate.</>
+          ) : (
+            <>Tap <strong className="text-slate-400">+ Set limit</strong> to configure your {label.toLowerCase()} budget.</>
+          )}
         </p>
       ) : (
         <>
@@ -210,15 +223,13 @@ export default function HomeView({
   onEditTransaction,
   onDeleteTransaction,
 }) {
-  // ── 3-Period budget state ──────────────────────────────────────────────────
-  // Use new keys for the unified tracker
-  const [dailyBudget,   setDailyBudget]   = useLocalStorage('myvaluta-budget-daily',   0);
-  const [weeklyBudget,  setWeeklyBudget]  = useLocalStorage('myvaluta-budget-weekly',  0);
-  
-  // Try to migrate from legacy 'myvaluta-budget-cap' if monthly is not set yet
-  // We can't easily do complex migrations inside useLocalStorage directly in this simple component,
-  // but we can just provide a default. Let's just stick to the new keys and default to 0.
+  // ── Auto-calculated budget state ───────────────────────────────────────────
   const [monthlyBudget, setMonthlyBudget] = useLocalStorage('myvaluta-budget-monthly', 0);
+  
+  // Daily and Weekly budgets are fixed ratios of the Monthly budget
+  // Average days in month = 30.437, Average weeks in month = 4.345
+  const dailyBudget = useMemo(() => Math.round(monthlyBudget / 30.436875), [monthlyBudget]);
+  const weeklyBudget = useMemo(() => Math.round(monthlyBudget / 4.34524), [monthlyBudget]);
 
   const stats = calculateWeeklyStats(transactions);
   const todayStr = localDateStr();
@@ -371,18 +382,18 @@ export default function HomeView({
             Icon={Sun}
             spent={dailySpent}
             budget={dailyBudget}
-            onSave={setDailyBudget}
             resetLabel={getDailyResetLabel()}
             selectedCurrency={selectedCurrency}
+            isDerived={true}
           />
           <BudgetPeriodCard
             label="This Week"
             Icon={Calendar}
             spent={weeklySpent}
             budget={weeklyBudget}
-            onSave={setWeeklyBudget}
             resetLabel={getWeeklyResetLabel()}
             selectedCurrency={selectedCurrency}
+            isDerived={true}
           />
           <BudgetPeriodCard
             label="This Month"
